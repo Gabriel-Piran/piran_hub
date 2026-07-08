@@ -1,0 +1,10 @@
+{
+  "nome": "Gabriel Piran",
+  "email": "gabriel@piranadvocacia.com.br",
+  "escritorio": "Escritório Gabriel Piran Sociedade Individual de Advocacia",
+  "notificacoes": {
+    "novoLead": true,
+    "novaMensagem": true,
+    "contrato": false
+  }
+}

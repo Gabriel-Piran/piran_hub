@@ -1,0 +1,115 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  MessageSquare,
+  Settings,
+  Users,
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/leads", label: "Leads", icon: Users },
+  { href: "/dashboard/conversas", label: "Conversas", icon: MessageSquare },
+  { href: "/dashboard/contratos", label: "Contratos", icon: FileText },
+  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  };
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <aside
+        className={cn(
+          "group fixed inset-y-0 left-0 z-40 flex w-16 flex-col overflow-hidden",
+          "border-r border-white/5 bg-[#111111] transition-all duration-200 ease-out hover:w-60"
+        )}
+      >
+        <div className="flex h-16 shrink-0 items-center px-4">
+          <span className="text-xl font-bold tracking-tight text-[#c9a84c]">
+            PH
+          </span>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-1 px-2 py-2">
+          {NAV_ITEMS.map((item) => {
+            const isActive =
+              item.href === "/dashboard"
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
+            const Icon = item.icon;
+
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-[#c9a84c]/10 text-[#c9a84c]"
+                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      {item.label}
+                    </span>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">{item.label}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </nav>
+
+        <div className="flex flex-col gap-2 border-t border-white/5 px-2 py-3">
+          <div className="flex items-center gap-3 rounded-md px-1 py-1">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback>GP</AvatarFallback>
+            </Avatar>
+            <span className="truncate whitespace-nowrap text-sm text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              Dr. Gabriel Piran
+            </span>
+          </div>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleLogout}
+                className="flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-red-400"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  Sair
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Sair</TooltipContent>
+          </Tooltip>
+        </div>
+      </aside>
+    </TooltipProvider>
+  );
+}
