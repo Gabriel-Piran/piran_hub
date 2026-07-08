@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
-import { Megaphone, Share2 } from "lucide-react";
+import { Megaphone, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
@@ -239,6 +240,31 @@ function ConfiguracoesView() {
               {isAdsConectado ? "conectado" : "desconectado"}
             </Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="items-start gap-1 p-6">
+          <CardTitle>Usuários</CardTitle>
+          <p className="text-sm text-white/50">
+            Gerencie quem tem acesso ao Piran Hub e com qual perfil.
+          </p>
+        </CardHeader>
+        <CardContent className="p-6 pt-0">
+          <Link
+            href="/dashboard/configuracoes/usuarios"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Gerenciar usuários</p>
+                <p className="text-xs text-white/40">
+                  Criar, editar, ativar/desativar e redefinir senhas
+                </p>
+              </div>
+            </div>
+          </Link>
         </CardContent>
       </Card>
     </div>

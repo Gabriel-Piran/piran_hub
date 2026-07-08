@@ -86,3 +86,22 @@ export interface ChartPoint {
   qualificados: number;
   contratos: number;
 }
+
+export type Perfil = "admin" | "advogado" | "secretaria" | "estagio";
+
+export const PERFIL_LABELS: Record<Perfil, string> = {
+  admin: "Administrador",
+  advogado: "Advogado",
+  secretaria: "Secretária",
+  estagio: "Estagiário",
+};
+
+export interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+  perfil: Perfil;
+  ativo: boolean;
+  criado_em: string;
+  ultimo_acesso: string | null;
+}

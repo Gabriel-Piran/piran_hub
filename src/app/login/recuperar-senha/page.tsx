@@ -10,10 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function LoginPage() {
+export default function RecuperarSenhaPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -21,20 +20,21 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/recuperar-senha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify({ email }),
       });
 
+      const body = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        toast.error(body?.error ?? "Não foi possível entrar.");
+        toast.error(body?.error ?? "Não foi possível enviar o código.");
         return;
       }
 
-      router.push("/dashboard");
-      router.refresh();
+      toast.success("Se o email existir, um código foi enviado.");
+      router.push("/login/redefinir-senha");
     } catch {
       toast.error("Erro de conexão. Tente novamente.");
     } finally {
@@ -50,7 +50,7 @@ export default function LoginPage() {
             Piran Hub
           </span>
           <CardTitle className="text-sm font-normal text-white/50">
-            Painel interno do escritório
+            Recuperar senha
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 pt-0">
@@ -66,27 +66,21 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="senha">Senha</Label>
-              <Input
-                id="senha"
-                type="password"
-                autoComplete="current-password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-              />
-            </div>
             <Button type="submit" disabled={loading} className="mt-2">
-              {loading ? "Entrando..." : "Entrar"}
+              {loading ? "Enviando..." : "Enviar código"}
             </Button>
 
-            <Link
-              href="/login/recuperar-senha"
-              className="text-center text-sm text-[#c9a84c] hover:underline"
-            >
-              Esqueci minha senha
-            </Link>
+            <div className="flex justify-between text-sm">
+              <Link href="/login" className="text-white/40 hover:underline">
+                Voltar ao login
+              </Link>
+              <Link
+                href="/login/redefinir-senha"
+                className="text-[#c9a84c] hover:underline"
+              >
+                Já tenho um código
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -11,6 +11,8 @@ import {
   Users,
 } from "lucide-react";
 
+import { useSession } from "@/hooks/useSession";
+import type { Perfil } from "@/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -20,23 +22,60 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/leads", label: "Leads", icon: Users },
-  { href: "/dashboard/conversas", label: "Conversas", icon: MessageSquare },
-  { href: "/dashboard/contratos", label: "Contratos", icon: FileText },
-  { href: "/dashboard/configuracoes", label: "Configurações", icon: Settings },
+const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles: Perfil[] }[] = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    roles: ["admin", "advogado"],
+  },
+  {
+    href: "/dashboard/leads",
+    label: "Leads",
+    icon: Users,
+    roles: ["admin", "advogado", "secretaria", "estagio"],
+  },
+  {
+    href: "/dashboard/conversas",
+    label: "Conversas",
+    icon: MessageSquare,
+    roles: ["admin", "advogado", "secretaria", "estagio"],
+  },
+  {
+    href: "/dashboard/contratos",
+    label: "Contratos",
+    icon: FileText,
+    roles: ["admin", "advogado"],
+  },
+  {
+    href: "/dashboard/configuracoes",
+    label: "Configurações",
+    icon: Settings,
+    roles: ["admin"],
+  },
 ];
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useSession();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   };
+
+  const visibleItems = user
+    ? NAV_ITEMS.filter((item) => item.roles.includes(user.perfil))
+    : [];
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -53,7 +92,7 @@ export function Sidebar() {
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 px-2 py-2">
-          {NAV_ITEMS.map((item) => {
+          {visibleItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === item.href
@@ -85,14 +124,27 @@ export function Sidebar() {
         </nav>
 
         <div className="flex flex-col gap-2 border-t border-white/5 px-2 py-3">
-          <div className="flex items-center gap-3 rounded-md px-1 py-1">
-            <Avatar className="h-8 w-8 shrink-0">
-              <AvatarFallback>GP</AvatarFallback>
-            </Avatar>
-            <span className="truncate whitespace-nowrap text-sm text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-              Dr. Gabriel Piran
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/dashboard/perfil"
+                className={cn(
+                  "flex items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-white/5",
+                  pathname === "/dashboard/perfil" && "bg-[#c9a84c]/10"
+                )}
+              >
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarFallback>
+                    {user ? initials(user.nome) : "..."}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="truncate whitespace-nowrap text-sm text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  {user?.nome ?? "Carregando..."}
+                </span>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Meu perfil</TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>

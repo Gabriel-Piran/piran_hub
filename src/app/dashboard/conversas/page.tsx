@@ -7,6 +7,7 @@ import { Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { useLead, useRecentMessages } from "@/hooks/useDashboard";
+import { useSession } from "@/hooks/useSession";
 import type { Mensagem } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,8 @@ function ChatBubble({ mensagem }: { mensagem: Mensagem }) {
 
 function ConversationsView() {
   const { messages, isLoading } = useRecentMessages();
+  const { user } = useSession();
+  const podeEnviar = user?.perfil !== "estagio";
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -199,28 +202,34 @@ function ConversationsView() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2 border-t border-white/10 px-6 py-4">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Escreva uma mensagem..."
-                className="flex-1 rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
-              />
-              <button
-                onClick={handleSend}
-                disabled={sending || !draft.trim()}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#c9a84c] text-[#0f0f0f] transition-colors hover:bg-[#d9bb63] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Enviar"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-            </div>
+            {podeEnviar ? (
+              <div className="flex items-center gap-2 border-t border-white/10 px-6 py-4">
+                <input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Escreva uma mensagem..."
+                  className="flex-1 rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !draft.trim()}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#c9a84c] text-[#0f0f0f] transition-colors hover:bg-[#d9bb63] disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Enviar"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-white/10 px-6 py-4 text-center text-xs text-white/40">
+                Seu perfil tem acesso somente para visualização.
+              </div>
+            )}
           </>
         )}
 
