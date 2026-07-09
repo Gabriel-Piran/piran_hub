@@ -43,12 +43,16 @@ interface WhatsappStatus {
 function ConfiguracoesView() {
   const { data: config, mutate } = useSWR(
     "/api/configuracoes/perfil",
-    (endpoint: string) => apiFetch<PerfilConfig>(endpoint)
+    (endpoint: string) => apiFetch<PerfilConfig>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
   const { data: adsStatus } = useSWR(
     "/api/configuracoes/whatsapp-status",
     (endpoint: string) => apiFetch<WhatsappStatus>(endpoint),
-    { refreshInterval: 30_000 }
+    {
+      refreshInterval: 30_000,
+      onError: (err) => console.error("SWR error:", err),
+    }
   );
 
   const nomeRef = useRef<HTMLInputElement>(null);

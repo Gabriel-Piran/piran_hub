@@ -14,8 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
+function initials(name: string | null | undefined): string {
+  const parts = String(name || "").trim().split(/\s+/);
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();

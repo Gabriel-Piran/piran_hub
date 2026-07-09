@@ -123,10 +123,12 @@ export function Header() {
                             {item.descricao}
                           </p>
                           <p className="text-[10px] text-white/30">
-                            {formatDistanceToNow(new Date(item.data), {
-                              addSuffix: true,
-                              locale: ptBR,
-                            })}
+                            {item.data
+                              ? formatDistanceToNow(new Date(item.data), {
+                                  addSuffix: true,
+                                  locale: ptBR,
+                                })
+                              : ""}
                           </p>
                         </div>
                       </Link>

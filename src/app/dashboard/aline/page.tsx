@@ -140,9 +140,12 @@ function PromptEditor({
 }
 
 function AlineView() {
-  const { data: prompts, isLoading, mutate } = useSWR("/api/prompts", (endpoint: string) =>
-    apiFetch<PromptAline[]>(endpoint)
+  const { data: rawPrompts, isLoading, mutate } = useSWR(
+    "/api/prompts",
+    (endpoint: string) => apiFetch<PromptAline[]>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
+  const prompts = Array.isArray(rawPrompts) ? rawPrompts : [];
   const { user } = useSession();
   const readOnly = user?.perfil !== "admin";
 

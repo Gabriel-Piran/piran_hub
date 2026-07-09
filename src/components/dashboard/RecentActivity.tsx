@@ -9,19 +9,21 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
+function initials(name: string | null | undefined): string {
+  const parts = String(name || "").trim().split(/\s+/);
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();
 }
 
-function truncate(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max).trimEnd()}...` : text;
+function truncate(text: string | null | undefined, max: number): string {
+  const safe = String(text || "");
+  return safe.length > max ? `${safe.slice(0, max).trimEnd()}...` : safe;
 }
 
 export function RecentActivity() {
   const { messages, isLoading } = useRecentMessages();
+  const safeMessages = Array.isArray(messages) ? messages : [];
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#1a1a1a] p-4">
@@ -42,7 +44,7 @@ export function RecentActivity() {
           ))}
 
         {!isLoading &&
-          messages.map((message, i) => (
+          safeMessages.map((message, i) => (
             <motion.div
               key={message.id}
               initial={{ opacity: 0, x: 8 }}
@@ -57,22 +59,24 @@ export function RecentActivity() {
               <div className="flex flex-1 flex-col gap-0.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium text-white">
-                    {message.lead_nome}
+                    {message.lead_nome || "Lead"}
                   </p>
                   <Badge
                     variant={message.instancia === "ads" ? "ads" : "indicacoes"}
                   >
-                    {message.instancia}
+                    {message.instancia || "indicacoes"}
                   </Badge>
                 </div>
                 <p className="text-xs text-white/50">
                   {truncate(message.conteudo, 60)}
                 </p>
                 <p className="text-[11px] text-white/30">
-                  {formatDistanceToNow(new Date(message.enviado_em), {
-                    addSuffix: true,
-                    locale: ptBR,
-                  })}
+                  {message.enviado_em
+                    ? formatDistanceToNow(new Date(message.enviado_em), {
+                        addSuffix: true,
+                        locale: ptBR,
+                      })
+                    : ""}
                 </p>
               </div>
             </motion.div>

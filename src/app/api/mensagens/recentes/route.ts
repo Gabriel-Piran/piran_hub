@@ -61,12 +61,12 @@ export async function GET(request: Request) {
       return {
         id: row.id,
         lead_id: row.lead_id,
-        lead_nome: leadInfo?.nome ?? "Lead",
-        conteudo: row.conteudo,
+        lead_nome: leadInfo?.nome || "Lead",
+        conteudo: row.conteudo || "",
         role: row.role as Mensagem["role"],
         tipo: row.tipo as Mensagem["tipo"],
         enviado_em: row.enviado_em,
-        instancia: (leadInfo?.instancia ?? "ads") as Mensagem["instancia"],
+        instancia: (leadInfo?.instancia || "ads") as Mensagem["instancia"],
         departamento_id: leadInfo?.departamento_id ?? null,
       };
     });

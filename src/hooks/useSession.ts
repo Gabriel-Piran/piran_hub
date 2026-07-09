@@ -12,8 +12,10 @@ export interface SessionUser {
 }
 
 export function useSession() {
-  const { data, error, isLoading, mutate } = useSWR("/api/auth/me", (endpoint) =>
-    apiFetch<SessionUser>(endpoint)
+  const { data, error, isLoading, mutate } = useSWR(
+    "/api/auth/me",
+    (endpoint) => apiFetch<SessionUser>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
 
   return {

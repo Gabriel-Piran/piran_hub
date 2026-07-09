@@ -36,8 +36,8 @@ function LeadsTable() {
       .filter(
         (lead) =>
           term === "" ||
-          lead.nome.toLowerCase().includes(term) ||
-          lead.numero_whatsapp.toLowerCase().includes(term)
+          String(lead.nome || "").toLowerCase().includes(term) ||
+          String(lead.numero_whatsapp || "").toLowerCase().includes(term)
       )
       .sort(
         (a, b) =>

@@ -56,7 +56,14 @@ export async function GET(
     return NextResponse.json({ error: mensagensError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ...lead, mensagens: mensagens ?? [] });
+  return NextResponse.json({
+    ...lead,
+    nome: lead.nome || "",
+    numero_whatsapp: lead.numero_whatsapp || "",
+    estagio: lead.estagio || "RECEPCAO",
+    status: lead.status || "ativo",
+    mensagens: (mensagens ?? []).map((m) => ({ ...m, conteudo: m.conteudo || "" })),
+  });
 }
 
 export async function PATCH(

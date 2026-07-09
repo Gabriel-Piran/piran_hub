@@ -21,8 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
 import { cn } from "@/lib/utils";
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
+function initials(name: string | null | undefined): string {
+  const parts = String(name || "").trim().split(/\s+/);
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();
@@ -119,12 +119,14 @@ function ChatBubble({
           cancelado && "opacity-40 line-through"
         )}
       >
-        {mensagem.conteudo}
+        {mensagem.conteudo || ""}
         <p className="mt-1 text-[10px] text-white/30">
-          {formatDistanceToNow(new Date(mensagem.enviado_em), {
-            addSuffix: true,
-            locale: ptBR,
-          })}
+          {mensagem.enviado_em
+            ? formatDistanceToNow(new Date(mensagem.enviado_em), {
+                addSuffix: true,
+                locale: ptBR,
+              })
+            : ""}
         </p>
       </div>
     </div>
@@ -140,12 +142,12 @@ function QuickMessagesPopover({
   filtro: string;
   onSelect: (mensagem: MensagemRapida) => void;
 }) {
-  const filtradas = mensagens.filter(
+  const filtradas = (Array.isArray(mensagens) ? mensagens : []).filter(
     (m) =>
       m.ativo &&
       (filtro === "" ||
         m.atalho?.toLowerCase().includes(filtro.toLowerCase()) ||
-        m.titulo.toLowerCase().includes(filtro.toLowerCase()))
+        String(m.titulo || "").toLowerCase().includes(filtro.toLowerCase()))
   );
 
   if (filtradas.length === 0) return null;
@@ -174,9 +176,10 @@ function QuickMessagesPopover({
 function ConversationsView() {
   const [departamentoFiltro, setDepartamentoFiltro] = useState<string>("TODOS");
   const { departamentos } = useDepartamentos();
-  const { messages, isLoading } = useRecentMessages(
+  const { messages: rawMessages, isLoading } = useRecentMessages(
     departamentoFiltro === "TODOS" ? null : departamentoFiltro
   );
+  const messages = Array.isArray(rawMessages) ? rawMessages : [];
   const { user } = useSession();
   const podeEnviar = user?.perfil !== "estagio";
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -194,7 +197,7 @@ function ConversationsView() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [lead?.mensagens.length]);
+  }, [lead?.mensagens?.length]);
 
   useEffect(() => {
     setNotaMode(false);
@@ -399,16 +402,16 @@ function ConversationsView() {
                     <div className="flex flex-1 flex-col gap-0.5 overflow-hidden">
                       <div className="flex items-center justify-between gap-2">
                         <p className="truncate text-sm font-medium text-white">
-                          {message.lead_nome}
+                          {message.lead_nome || "Lead"}
                         </p>
                         <Badge
                           variant={message.instancia === "ads" ? "ads" : "indicacoes"}
                         >
-                          {message.instancia}
+                          {message.instancia || "indicacoes"}
                         </Badge>
                       </div>
                       <p className="truncate text-xs text-white/50">
-                        {message.conteudo}
+                        {message.conteudo || ""}
                       </p>
                     </div>
                   </button>
@@ -482,12 +485,12 @@ function ConversationsView() {
                 ref={scrollRef}
                 className="flex flex-1 flex-col gap-3 overflow-y-auto p-6"
               >
-                {lead.mensagens.length === 0 && (
+                {(!Array.isArray(lead.mensagens) || lead.mensagens.length === 0) && (
                   <p className="text-center text-sm text-white/40">
                     Nenhuma mensagem ainda.
                   </p>
                 )}
-                {lead.mensagens.map((mensagem) => (
+                {(Array.isArray(lead.mensagens) ? lead.mensagens : []).map((mensagem) => (
                   <ChatBubble
                     key={mensagem.id}
                     mensagem={mensagem}

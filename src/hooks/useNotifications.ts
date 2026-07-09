@@ -36,8 +36,10 @@ function readLastSeen(): string {
 }
 
 export function useNotifications() {
-  const { data: config } = useSWR("/api/configuracoes/perfil", (endpoint: string) =>
-    apiFetch<PerfilConfig>(endpoint)
+  const { data: config } = useSWR(
+    "/api/configuracoes/perfil",
+    (endpoint: string) => apiFetch<PerfilConfig>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
   const { leads } = useLeads();
   const { messages } = useRecentMessages();
@@ -46,8 +48,12 @@ export function useNotifications() {
   const { data: contratos } = useSWR(
     podeVerContratos ? "/api/contratos" : null,
     (endpoint: string) => apiFetch<Lead[]>(endpoint),
-    { refreshInterval: 30_000 }
+    {
+      refreshInterval: 30_000,
+      onError: (err) => console.error("SWR error:", err),
+    }
   );
+  const safeContratos = Array.isArray(contratos) ? contratos : [];
 
   const [lastSeen, setLastSeen] = useState<string>(() => readLastSeen());
   const sessionStartRef = useRef(new Date().toISOString());
@@ -62,12 +68,12 @@ export function useNotifications() {
   const items: NotificationItem[] = [];
 
   if (notificacoes.novoLead) {
-    for (const lead of leads) {
+    for (const lead of Array.isArray(leads) ? leads : []) {
       items.push({
         id: `lead-${lead.id}`,
         tipo: "lead",
         titulo: "Novo lead",
-        descricao: lead.nome,
+        descricao: lead.nome || "",
         href: "/dashboard/leads",
         data: lead.criado_em,
       });
@@ -75,12 +81,12 @@ export function useNotifications() {
   }
 
   if (notificacoes.novaMensagem) {
-    for (const mensagem of messages) {
+    for (const mensagem of Array.isArray(messages) ? messages : []) {
       items.push({
         id: `mensagem-${mensagem.id}`,
         tipo: "mensagem",
         titulo: "Nova mensagem",
-        descricao: `${mensagem.lead_nome}: ${mensagem.conteudo}`,
+        descricao: `${mensagem.lead_nome || "Lead"}: ${mensagem.conteudo || ""}`,
         href: "/dashboard/conversas",
         data: mensagem.enviado_em,
       });
@@ -88,13 +94,13 @@ export function useNotifications() {
   }
 
   if (notificacoes.contrato) {
-    for (const lead of contratos ?? []) {
-      if (lead.status !== "contrato_assinado") continue;
+    for (const lead of safeContratos) {
+      if ((lead.status || "ativo") !== "contrato_assinado") continue;
       items.push({
         id: `contrato-${lead.id}`,
         tipo: "contrato",
         titulo: "Contrato assinado",
-        descricao: lead.nome,
+        descricao: lead.nome || "",
         href: "/dashboard/contratos",
         data: lead.atualizado_em,
       });

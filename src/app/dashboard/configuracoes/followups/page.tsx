@@ -42,11 +42,13 @@ const EMPTY_FORM: FormState = {
 };
 
 function useFollowupRegras() {
-  const { data, isLoading, mutate } = useSWR("/api/followup-regras", (endpoint: string) =>
-    apiFetch<FollowupRegra[]>(endpoint)
+  const { data, isLoading, mutate } = useSWR(
+    "/api/followup-regras",
+    (endpoint: string) => apiFetch<FollowupRegra[]>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
 
-  return { regras: data ?? [], isLoading, mutate };
+  return { regras: Array.isArray(data) ? data : [], isLoading, mutate };
 }
 
 function FollowupsView() {

@@ -45,5 +45,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  const leads = (data ?? []).map((lead) => ({
+    ...lead,
+    nome: lead.nome || "",
+    numero_whatsapp: lead.numero_whatsapp || "",
+    estagio: lead.estagio || "RECEPCAO",
+    status: lead.status || "ativo",
+  }));
+
+  return NextResponse.json(leads);
 }

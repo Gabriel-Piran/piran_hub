@@ -45,9 +45,12 @@ const EMPTY_FORM: FormState = {
 };
 
 function UsuariosView() {
-  const { data: usuarios, isLoading, mutate } = useSWR("/api/usuarios", (endpoint) =>
-    apiFetch<Usuario[]>(endpoint)
+  const { data: rawUsuarios, isLoading, mutate } = useSWR(
+    "/api/usuarios",
+    (endpoint) => apiFetch<Usuario[]>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
   );
+  const usuarios = Array.isArray(rawUsuarios) ? rawUsuarios : [];
   const { departamentos } = useDepartamentos();
 
   const [modalOpen, setModalOpen] = useState(false);
