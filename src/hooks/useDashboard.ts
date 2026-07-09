@@ -10,9 +10,12 @@ import {
 import { LEAD_ESTAGIOS } from "@/types";
 import type {
   ChartPoint,
+  Departamento,
+  EstagioCustomizado,
   Lead,
   LeadComMensagens,
   LeadEstagio,
+  MensagemRapida,
   MetricasCard,
   Mensagem,
 } from "@/types";
@@ -74,11 +77,14 @@ export function useLeads() {
   };
 }
 
-export function useRecentMessages() {
+export function useRecentMessages(departamentoId?: string | null) {
+  const endpoint = departamentoId
+    ? `/api/mensagens/recentes?departamento_id=${departamentoId}`
+    : "/api/mensagens/recentes";
+
   const { data, error, isLoading } = useSWR(
-    "/api/mensagens/recentes",
-    (endpoint: string) =>
-      fetchWithFallback<Mensagem[]>(endpoint, mockMensagens),
+    endpoint,
+    (url: string) => fetchWithFallback<Mensagem[]>(url, mockMensagens),
     { refreshInterval: REFRESH_INTERVAL }
   );
 
@@ -102,6 +108,34 @@ export function useLead(id: string | null) {
     isError: !!error,
     mutate,
   };
+}
+
+export function useDepartamentos() {
+  const { data, isLoading, mutate } = useSWR("/api/departamentos", (endpoint: string) =>
+    apiFetch<Departamento[]>(endpoint)
+  );
+
+  return { departamentos: data ?? [], isLoading, mutate };
+}
+
+export function useEstagios() {
+  const { data, isLoading, mutate } = useSWR("/api/estagios", (endpoint: string) =>
+    apiFetch<EstagioCustomizado[]>(endpoint)
+  );
+
+  return { estagios: data ?? [], isLoading, mutate };
+}
+
+export function useMensagensRapidas(departamentoId?: string | null) {
+  const endpoint = departamentoId
+    ? `/api/mensagens-rapidas?departamento_id=${departamentoId}`
+    : "/api/mensagens-rapidas";
+
+  const { data, isLoading, mutate } = useSWR(endpoint, (url: string) =>
+    apiFetch<MensagemRapida[]>(url)
+  );
+
+  return { mensagensRapidas: data ?? [], isLoading, mutate };
 }
 
 export function useLeadsChart(days = 7) {

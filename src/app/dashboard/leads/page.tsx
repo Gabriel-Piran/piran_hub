@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Search } from "lucide-react";
 
-import { useLeads } from "@/hooks/useDashboard";
+import { useDepartamentos, useEstagios, useLeads } from "@/hooks/useDashboard";
 import { ESTAGIO_LABELS } from "@/lib/labels";
 import { LEAD_ESTAGIOS } from "@/types";
 import type { Lead, LeadEstagio } from "@/types";
@@ -18,14 +18,21 @@ type EstagioFilter = "TODOS" | LeadEstagio;
 
 function LeadsTable() {
   const { leads, isLoading } = useLeads();
+  const { departamentos } = useDepartamentos();
+  const { estagios } = useEstagios();
   const [search, setSearch] = useState("");
   const [estagioFilter, setEstagioFilter] = useState<EstagioFilter>("TODOS");
+  const [departamentoFilter, setDepartamentoFilter] = useState<string>("TODOS");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const filteredLeads = useMemo(() => {
     const term = search.trim().toLowerCase();
     return leads
       .filter((lead) => estagioFilter === "TODOS" || lead.estagio === estagioFilter)
+      .filter(
+        (lead) =>
+          departamentoFilter === "TODOS" || lead.departamento_id === departamentoFilter
+      )
       .filter(
         (lead) =>
           term === "" ||
@@ -36,7 +43,7 @@ function LeadsTable() {
         (a, b) =>
           new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime()
       );
-  }, [leads, search, estagioFilter]);
+  }, [leads, search, estagioFilter, departamentoFilter]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -58,9 +65,28 @@ function LeadsTable() {
           className="rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
         >
           <option value="TODOS">Todos os estágios</option>
-          {LEAD_ESTAGIOS.map((estagio) => (
-            <option key={estagio} value={estagio}>
-              {ESTAGIO_LABELS[estagio]}
+          {estagios.length > 0
+            ? estagios.map((estagio) => (
+                <option key={estagio.id} value={estagio.slug}>
+                  {estagio.nome}
+                </option>
+              ))
+            : LEAD_ESTAGIOS.map((estagio) => (
+                <option key={estagio} value={estagio}>
+                  {ESTAGIO_LABELS[estagio]}
+                </option>
+              ))}
+        </select>
+
+        <select
+          value={departamentoFilter}
+          onChange={(e) => setDepartamentoFilter(e.target.value)}
+          className="rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+        >
+          <option value="TODOS">Todos os departamentos</option>
+          {departamentos.map((dep) => (
+            <option key={dep.id} value={dep.id}>
+              {dep.nome}
             </option>
           ))}
         </select>

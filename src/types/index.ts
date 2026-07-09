@@ -33,6 +33,14 @@ export type LeadStatus =
   | "contrato_enviado"
   | "contrato_assinado";
 
+export type ModoAtendimento = "ia" | "humano" | "pendente";
+
+export const MODO_ATENDIMENTO_LABELS: Record<ModoAtendimento, string> = {
+  ia: "IA",
+  humano: "Atendendo",
+  pendente: "Pendente",
+};
+
 export interface Lead {
   id: string;
   nome: string;
@@ -41,6 +49,8 @@ export interface Lead {
   instancia: Instancia;
   estagio: LeadEstagio;
   status: LeadStatus;
+  modo_atendimento: ModoAtendimento;
+  departamento_id?: string | null;
   salario?: number | null;
   cpf?: string | null;
   data_nascimento?: string | null;
@@ -57,6 +67,7 @@ export interface Lead {
 
 export type MensagemRole = "lead" | "assistente" | "sistema";
 export type MensagemTipo = "texto" | "audio" | "imagem" | "documento";
+export type MensagemAcaoExecutada = "enviado" | "cancelado" | null;
 
 export interface Mensagem {
   id: string;
@@ -67,6 +78,57 @@ export interface Mensagem {
   tipo: MensagemTipo;
   enviado_em: string;
   instancia: Instancia;
+  agendado_para?: string | null;
+  nota_interna?: boolean;
+  acao_executada?: MensagemAcaoExecutada;
+  departamento_id?: string | null;
+}
+
+export interface Departamento {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  cor: string;
+  ativo: boolean;
+  criado_em: string;
+}
+
+export type MensagemRapidaTipo = "texto" | "audio" | "video" | "imagem";
+
+export interface MensagemRapida {
+  id: string;
+  titulo: string;
+  tipo: MensagemRapidaTipo;
+  conteudo: string | null;
+  midia_url: string | null;
+  atalho: string | null;
+  departamento_id: string | null;
+  ativo: boolean;
+  criado_por: string | null;
+  criado_em: string;
+}
+
+export interface EstagioCustomizado {
+  id: string;
+  nome: string;
+  slug: string;
+  cor: string;
+  icone: string | null;
+  ordem: number;
+  ativo: boolean;
+  criado_em: string;
+}
+
+export interface FollowupRegra {
+  id: string;
+  nome: string;
+  estagio_gatilho: string;
+  dias_espera: number;
+  hora_envio: string;
+  mensagem_rapida_id: string | null;
+  mensagem_texto: string | null;
+  ativo: boolean;
+  criado_em: string;
 }
 
 export interface LeadComMensagens extends Lead {
@@ -104,6 +166,7 @@ export interface Usuario {
   ativo: boolean;
   criado_em: string;
   ultimo_acesso: string | null;
+  departamento_ids?: string[];
 }
 
 export interface PromptAline {

@@ -5,7 +5,7 @@ import { LEAD_ESTAGIOS } from "@/types";
 import type { LeadEstagio, LeadStatus } from "@/types";
 
 const LEAD_COLUMNS =
-  "id, nome, nome_whatsapp, numero_whatsapp, instancia, estagio, status, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em";
+  "id, nome, nome_whatsapp, numero_whatsapp, instancia, estagio, status, modo_atendimento, departamento_id, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em";
 
 const UPDATABLE_FIELDS = [
   "nome",
@@ -14,6 +14,7 @@ const UPDATABLE_FIELDS = [
   "instancia",
   "estagio",
   "status",
+  "departamento_id",
   "salario",
   "cpf",
   "data_nascimento",
@@ -45,7 +46,9 @@ export async function GET(
 
   const { data: mensagens, error: mensagensError } = await supabase
     .from("mensagens")
-    .select("id, lead_id, conteudo, role, tipo, enviado_em")
+    .select(
+      "id, lead_id, conteudo, role, tipo, enviado_em, agendado_para, nota_interna, acao_executada"
+    )
     .eq("lead_id", id)
     .order("enviado_em", { ascending: true });
 

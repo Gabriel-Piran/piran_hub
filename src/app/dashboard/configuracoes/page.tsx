@@ -3,7 +3,15 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { Megaphone, Share2, Users } from "lucide-react";
+import {
+  Building2,
+  Clock,
+  Megaphone,
+  MessageSquareText,
+  Share2,
+  Users,
+  Workflow,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
@@ -261,6 +269,76 @@ function ConfiguracoesView() {
                 <p className="text-sm text-white">Gerenciar usuários</p>
                 <p className="text-xs text-white/40">
                   Criar, editar, ativar/desativar e redefinir senhas
+                </p>
+              </div>
+            </div>
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="items-start gap-1 p-6">
+          <CardTitle>Atendimento</CardTitle>
+          <p className="text-sm text-white/50">
+            Personalize o funil, as mensagens e a organização do atendimento.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 p-6 pt-0">
+          <Link
+            href="/dashboard/configuracoes/departamentos"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Departamentos</p>
+                <p className="text-xs text-white/40">
+                  Organize equipes e atribua leads por área
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/estagios"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <Workflow className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Estágios do funil</p>
+                <p className="text-xs text-white/40">
+                  Crie, edite e reordene os estágios do funil de leads
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/mensagens-rapidas"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <MessageSquareText className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Mensagens rápidas</p>
+                <p className="text-xs text-white/40">
+                  Modelos de texto, áudio, vídeo e imagem para o atendimento
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/followups"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Follow-ups automáticos</p>
+                <p className="text-xs text-white/40">
+                  Regras de reengajamento automático por estágio
                 </p>
               </div>
             </div>

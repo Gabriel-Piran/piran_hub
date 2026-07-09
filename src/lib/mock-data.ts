@@ -39,6 +39,8 @@ export const mockLeads: Lead[] = LEAD_ESTAGIOS.flatMap((estagio, i) => {
       instancia: idx % 2 === 0 ? "ads" : ("indicacoes" as const),
       estagio,
       status: status as Lead["status"],
+      modo_atendimento: "ia" as const,
+      departamento_id: null,
       salario: 1800 + idx * 120,
       cpf: null,
       data_nascimento: null,

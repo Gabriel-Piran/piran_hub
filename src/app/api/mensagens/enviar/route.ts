@@ -3,10 +3,18 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig } from "@/lib/zapi";
 
+const ZAPI_ENDPOINT_POR_TIPO: Record<string, { path: string; field: string }> = {
+  texto: { path: "send-text", field: "message" },
+  audio: { path: "send-audio", field: "audio" },
+  video: { path: "send-video", field: "video" },
+  imagem: { path: "send-image", field: "image" },
+};
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const leadId = typeof body?.lead_id === "string" ? body.lead_id : "";
   const mensagem = typeof body?.mensagem === "string" ? body.mensagem.trim() : "";
+  const tipo = typeof body?.tipo === "string" ? body.tipo : "texto";
 
   if (!leadId || !mensagem) {
     return NextResponse.json(
@@ -14,6 +22,8 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  const endpoint = ZAPI_ENDPOINT_POR_TIPO[tipo] ?? ZAPI_ENDPOINT_POR_TIPO.texto;
 
   const zapi = zapiConfig();
   if (!zapi) {
@@ -35,12 +45,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   }
 
-  const zapiRes = await fetch(`${zapi.baseUrl}/send-text`, {
+  const zapiRes = await fetch(`${zapi.baseUrl}/${endpoint.path}`, {
     method: "POST",
     headers: zapi.headers,
     body: JSON.stringify({
       phone: lead.numero_whatsapp,
-      message: mensagem,
+      [endpoint.field]: mensagem,
     }),
   });
 
@@ -58,7 +68,7 @@ export async function POST(request: Request) {
       lead_id: leadId,
       conteudo: mensagem,
       role: "sistema",
-      tipo: "texto",
+      tipo,
       enviado_em: new Date().toISOString(),
     })
     .select("id, lead_id, conteudo, role, tipo, enviado_em")

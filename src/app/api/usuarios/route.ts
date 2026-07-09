@@ -6,6 +6,7 @@ import { hashPassword } from "@/lib/password";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const USUARIO_COLUMNS = "id, nome, email, perfil, ativo, criado_em, ultimo_acesso";
+const USUARIO_COLUMNS_COM_DEPARTAMENTOS = `${USUARIO_COLUMNS}, usuarios_departamentos(departamento_id)`;
 
 function isAdmin(request: Request) {
   return request.headers.get("x-user-perfil") === "admin";
@@ -19,14 +20,22 @@ export async function GET(request: Request) {
   const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from("usuarios")
-    .select(USUARIO_COLUMNS)
+    .select(USUARIO_COLUMNS_COM_DEPARTAMENTOS)
     .order("nome", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  const usuarios = (data ?? []).map((u) => ({
+    ...u,
+    departamento_ids: (u.usuarios_departamentos ?? []).map(
+      (d: { departamento_id: string }) => d.departamento_id
+    ),
+    usuarios_departamentos: undefined,
+  }));
+
+  return NextResponse.json(usuarios);
 }
 
 export async function POST(request: Request) {

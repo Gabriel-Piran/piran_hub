@@ -56,11 +56,43 @@ const API_RULES: RouteRule[] = [
     methods: ["POST"],
   },
   {
+    prefix: "/api/mensagens/agendadas",
+    roles: ["admin", "advogado", "secretaria"],
+    methods: ["GET"],
+  },
+  {
+    prefix: "/api/mensagens",
+    roles: ["admin", "advogado", "secretaria"],
+    methods: ["POST", "PATCH"],
+  },
+  {
     prefix: "/api/leads",
     roles: ["admin", "advogado", "secretaria"],
     methods: ["PATCH", "POST", "DELETE"],
   },
+  {
+    prefix: "/api/mensagens-rapidas",
+    roles: ["admin"],
+    methods: ["POST", "PATCH", "DELETE"],
+  },
+  { prefix: "/api/mensagens-rapidas", roles: ["admin", "advogado", "secretaria"] },
+  {
+    prefix: "/api/estagios",
+    roles: ["admin"],
+    methods: ["POST", "PATCH", "DELETE"],
+  },
+  { prefix: "/api/estagios", roles: ALL_PERFIS },
+  { prefix: "/api/followup-regras", roles: ["admin"] },
+  { prefix: "/api/followup-processar", roles: ["admin"] },
+  {
+    prefix: "/api/departamentos",
+    roles: ["admin"],
+    methods: ["POST", "PATCH", "DELETE"],
+  },
+  { prefix: "/api/departamentos", roles: ALL_PERFIS },
 ];
+
+const CRON_SECRET_ROUTES = ["/api/followup-processar", "/api/mensagens/agendadas"];
 
 function matchRule(rules: RouteRule[], pathname: string, method: string) {
   return rules.find((rule) => {
@@ -76,6 +108,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/auth") || pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
+  if (
+    request.method === "GET" &&
+    CRON_SECRET_ROUTES.includes(pathname) &&
+    process.env.CRON_SECRET &&
+    request.headers.get("x-cron-secret") === process.env.CRON_SECRET
+  ) {
     return NextResponse.next();
   }
 

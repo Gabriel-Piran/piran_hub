@@ -8,6 +8,7 @@ import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
+import { useDepartamentos } from "@/hooks/useDashboard";
 import { PERFIL_LABELS } from "@/types";
 import type { Perfil, Usuario } from "@/types";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ interface FormState {
   email: string;
   senha: string;
   perfil: Perfil;
+  departamentoIds: string[];
 }
 
 const EMPTY_FORM: FormState = {
@@ -39,12 +41,14 @@ const EMPTY_FORM: FormState = {
   email: "",
   senha: "",
   perfil: "advogado",
+  departamentoIds: [],
 };
 
 function UsuariosView() {
   const { data: usuarios, isLoading, mutate } = useSWR("/api/usuarios", (endpoint) =>
     apiFetch<Usuario[]>(endpoint)
   );
+  const { departamentos } = useDepartamentos();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -68,8 +72,40 @@ function UsuariosView() {
       email: usuario.email,
       senha: "",
       perfil: usuario.perfil,
+      departamentoIds: usuario.departamento_ids ?? [],
     });
     setModalOpen(true);
+  };
+
+  const toggleDepartamento = (id: string) => {
+    setForm((f) => ({
+      ...f,
+      departamentoIds: f.departamentoIds.includes(id)
+        ? f.departamentoIds.filter((d) => d !== id)
+        : [...f.departamentoIds, id],
+    }));
+  };
+
+  const syncDepartamentos = async (usuarioId: string, novosIds: string[]) => {
+    const original = usuarios?.find((u) => u.id === usuarioId)?.departamento_ids ?? [];
+    const paraAdicionar = novosIds.filter((id) => !original.includes(id));
+    const paraRemover = original.filter((id) => !novosIds.includes(id));
+
+    await Promise.all([
+      ...paraAdicionar.map((departamentoId) =>
+        fetch(`/api/departamentos/${departamentoId}/usuarios`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario_id: usuarioId }),
+        })
+      ),
+      ...paraRemover.map((departamentoId) =>
+        fetch(
+          `/api/departamentos/${departamentoId}/usuarios?usuario_id=${usuarioId}`,
+          { method: "DELETE" }
+        )
+      ),
+    ]);
   };
 
   const handleSave = async () => {
@@ -101,6 +137,9 @@ function UsuariosView() {
         toast.error(body?.error ?? "Não foi possível salvar o usuário.");
         return;
       }
+
+      const usuarioId = isEditing ? form.id! : body.id;
+      await syncDepartamentos(usuarioId, form.departamentoIds);
 
       toast.success(isEditing ? "Usuário atualizado." : "Usuário criado.");
       setModalOpen(false);
@@ -331,6 +370,34 @@ function UsuariosView() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Departamentos</Label>
+              <div className="flex flex-wrap gap-2">
+                {departamentos.map((dep) => {
+                  const checked = form.departamentoIds.includes(dep.id);
+                  return (
+                    <button
+                      key={dep.id}
+                      type="button"
+                      onClick={() => toggleDepartamento(dep.id)}
+                      className={
+                        checked
+                          ? "rounded-full border border-[#c9a84c]/40 bg-[#c9a84c]/10 px-3 py-1 text-xs text-[#c9a84c]"
+                          : "rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60"
+                      }
+                    >
+                      {dep.nome}
+                    </button>
+                  );
+                })}
+                {departamentos.length === 0 && (
+                  <span className="text-xs text-white/40">
+                    Nenhum departamento cadastrado.
+                  </span>
+                )}
+              </div>
             </div>
 
             <Button onClick={handleSave} disabled={saving} className="mt-2">
