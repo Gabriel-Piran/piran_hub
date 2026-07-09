@@ -39,6 +39,8 @@ export async function POST(request: Request) {
     typeof body?.departamento_id === "string" ? body.departamento_id : null;
   const criadoPor = request.headers.get("x-user-email");
 
+  const id = typeof body?.id === "string" ? body.id : undefined;
+
   if (!titulo || !TIPOS.includes(tipo)) {
     return NextResponse.json(
       { error: "título e tipo válido são obrigatórios" },
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("mensagens_rapidas")
     .insert({
+      id,
       titulo,
       tipo,
       conteudo,

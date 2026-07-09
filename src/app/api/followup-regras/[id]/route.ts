@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const COLUMNS =
-  "id, nome, estagio_gatilho, dias_espera, hora_envio, mensagem_rapida_id, mensagem_texto, ativo, criado_em";
+  "id, nome, estagio_gatilho, dias_espera, hora_envio, mensagem_rapida_id, mensagem_texto, ativo, criado_em, horario_inicio, horario_fim, intervalo_minutos_min, intervalo_minutos_max, dias_semana";
 
 export async function PATCH(
   request: Request,
@@ -23,6 +23,11 @@ export async function PATCH(
   if ("mensagem_rapida_id" in body) updates.mensagem_rapida_id = body.mensagem_rapida_id;
   if ("mensagem_texto" in body) updates.mensagem_texto = body.mensagem_texto;
   if ("ativo" in body) updates.ativo = Boolean(body.ativo);
+  if ("horario_inicio" in body) updates.horario_inicio = body.horario_inicio;
+  if ("horario_fim" in body) updates.horario_fim = body.horario_fim;
+  if ("intervalo_minutos_min" in body) updates.intervalo_minutos_min = Number(body.intervalo_minutos_min);
+  if ("intervalo_minutos_max" in body) updates.intervalo_minutos_max = Number(body.intervalo_minutos_max);
+  if ("dias_semana" in body) updates.dias_semana = body.dias_semana;
 
   const supabase = supabaseAdmin();
   const { data, error } = await supabase

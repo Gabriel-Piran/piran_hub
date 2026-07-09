@@ -72,6 +72,7 @@ export interface Mensagem {
   nota_interna?: boolean;
   acao_executada?: MensagemAcaoExecutada;
   departamento_id?: string | null;
+  midia_url?: string | null;
 }
 
 export interface Departamento {
@@ -119,6 +120,11 @@ export interface FollowupRegra {
   mensagem_texto: string | null;
   ativo: boolean;
   criado_em: string;
+  horario_inicio?: string;
+  horario_fim?: string;
+  intervalo_minutos_min?: number;
+  intervalo_minutos_max?: number;
+  dias_semana?: string[];
 }
 
 export interface LeadComMensagens extends Lead {

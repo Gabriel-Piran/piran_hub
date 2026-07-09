@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
 const COLUMNS =
-  "id, nome, estagio_gatilho, dias_espera, hora_envio, mensagem_rapida_id, mensagem_texto, ativo, criado_em";
+  "id, nome, estagio_gatilho, dias_espera, hora_envio, mensagem_rapida_id, mensagem_texto, ativo, criado_em, horario_inicio, horario_fim, intervalo_minutos_min, intervalo_minutos_max, dias_semana";
 
 export async function GET() {
   const supabase = supabaseAdmin();
@@ -31,6 +31,12 @@ export async function POST(request: Request) {
   const mensagemTexto =
     typeof body?.mensagem_texto === "string" ? body.mensagem_texto : null;
 
+  const horarioInicio = typeof body?.horario_inicio === "string" ? body.horario_inicio : "08:00";
+  const horarioFim = typeof body?.horario_fim === "string" ? body.horario_fim : "18:00";
+  const intervaloMinutosMin = Number(body?.intervalo_minutos_min ?? 1);
+  const intervaloMinutosMax = Number(body?.intervalo_minutos_max ?? 5);
+  const diasSemana = Array.isArray(body?.dias_semana) ? body.dias_semana : ["1", "2", "3", "4", "5"];
+
   if (!nome || !estagioGatilho || !Number.isFinite(diasEspera) || diasEspera < 0) {
     return NextResponse.json(
       { error: "nome, estagio_gatilho e dias_espera válidos são obrigatórios" },
@@ -55,6 +61,11 @@ export async function POST(request: Request) {
       hora_envio: horaEnvio,
       mensagem_rapida_id: mensagemRapidaId,
       mensagem_texto: mensagemTexto,
+      horario_inicio: horarioInicio,
+      horario_fim: horarioFim,
+      intervalo_minutos_min: intervaloMinutosMin,
+      intervalo_minutos_max: intervaloMinutosMax,
+      dias_semana: diasSemana,
     })
     .select(COLUMNS)
     .single();

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, UploadCloud, FileText, X } from "lucide-react";
 import { toast } from "sonner";
+import { useDropzone } from "react-dropzone";
+import { cn } from "@/lib/utils";
 
 import { useDepartamentos, useMensagensRapidas } from "@/hooks/useDashboard";
 import type { MensagemRapida, MensagemRapidaTipo } from "@/types";
@@ -53,6 +55,153 @@ const EMPTY_FORM: FormState = {
   departamento_id: "",
 };
 
+interface MediaUploadZoneProps {
+  value: string;
+  onChange: (url: string) => void;
+  messageId?: string;
+}
+
+function MediaUploadZone({ value, onChange, messageId }: MediaUploadZoneProps) {
+  const [progress, setProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  const onDrop = async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
+
+    if (file.size > 16 * 1024 * 1024) {
+      toast.error("O arquivo excede o limite máximo de 16MB.");
+      return;
+    }
+
+    setUploading(true);
+    setProgress(0);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (messageId) {
+      formData.append("id", messageId);
+    }
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload/midia-rapida", true);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setProgress(percent);
+        }
+      };
+
+      xhr.onload = () => {
+        setUploading(false);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const res = JSON.parse(xhr.responseText);
+            if (res.url) {
+              onChange(res.url);
+              toast.success("Mídia carregada com sucesso.");
+            } else {
+              toast.error("Erro no retorno da URL da mídia.");
+            }
+          } catch {
+            toast.error("Erro ao processar resposta do upload.");
+          }
+        } else {
+          toast.error("Erro ao enviar mídia.");
+        }
+      };
+
+      xhr.onerror = () => {
+        setUploading(false);
+        toast.error("Erro na conexão durante o upload.");
+      };
+
+      xhr.send(formData);
+    } catch (err) {
+      setUploading(false);
+      toast.error("Erro ao iniciar o upload.");
+    }
+  };
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    maxSize: 16 * 1024 * 1024,
+    accept: {
+      "image/*": [],
+      "audio/*": [],
+      "video/*": [],
+      "application/pdf": [],
+    },
+    multiple: false,
+  });
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        {...getRootProps()}
+        className={cn(
+          "flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer transition-colors min-h-[120px]",
+          isDragActive
+            ? "border-[#c9a84c] bg-[#c9a84c]/5"
+            : "border-white/10 hover:border-white/20 bg-white/5"
+        )}
+      >
+        <input {...getInputProps()} />
+        <UploadCloud className="h-8 w-8 text-white/50 mb-2" />
+        {isDragActive ? (
+          <p className="text-xs text-white/70">Solte o arquivo aqui...</p>
+        ) : (
+          <p className="text-xs text-white/50 text-center">
+            Arraste e solte o arquivo aqui, ou{" "}
+            <span className="text-[#c9a84c] font-medium">clique para selecionar</span>
+            <br />
+            <span className="text-[10px] opacity-60">(Máx: 16MB. Imagem, Áudio, Vídeo ou PDF)</span>
+          </p>
+        )}
+      </div>
+
+      {uploading && (
+        <div className="flex flex-col gap-1 w-full bg-white/5 border border-white/10 rounded-md p-2">
+          <div className="flex items-center justify-between text-xs text-white/50">
+            <span>Enviando arquivo...</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-[#c9a84c] h-full rounded-full transition-all duration-150"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {value && !uploading && (
+        <div className="flex items-center gap-3 rounded-md bg-white/5 border border-white/10 p-2">
+          {/\.(jpeg|jpg|gif|png|webp|svg)/i.test(value) || value.includes("/imagens/") ? (
+            <img src={value} alt="Preview" className="h-10 w-10 rounded object-cover" />
+          ) : (
+            <FileText className="h-6 w-6 text-[#c9a84c] shrink-0" />
+          )}
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-[11px] font-medium text-white truncate">{value}</span>
+            <span className="text-[9px] text-white/40">URL da mídia</span>
+          </div>
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-[#c9a84c] hover:underline"
+          >
+            Visualizar
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MensagensRapidasView() {
   const { mensagensRapidas, isLoading, mutate } = useMensagensRapidas();
   const { departamentos } = useDepartamentos();
@@ -63,7 +212,10 @@ function MensagensRapidasView() {
   const isEditing = Boolean(form.id);
 
   const openCreate = () => {
-    setForm(EMPTY_FORM);
+    setForm({
+      ...EMPTY_FORM,
+      id: crypto.randomUUID(),
+    });
     setModalOpen(true);
   };
 
@@ -90,11 +242,12 @@ function MensagensRapidasView() {
       return;
     }
     if (form.tipo !== "texto" && !form.midia_url.trim()) {
-      toast.error("Informe a URL de mídia.");
+      toast.error("Informe ou carregue o arquivo de mídia.");
       return;
     }
 
     const payload = {
+      id: form.id,
       titulo: form.titulo,
       tipo: form.tipo,
       conteudo: form.tipo === "texto" ? form.conteudo : null,
@@ -294,12 +447,11 @@ function MensagensRapidasView() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <Label htmlFor="msg-midia">URL de mídia</Label>
-                <Input
-                  id="msg-midia"
+                <Label>Mídia</Label>
+                <MediaUploadZone
                   value={form.midia_url}
-                  onChange={(e) => setForm((f) => ({ ...f, midia_url: e.target.value }))}
-                  placeholder="https://..."
+                  onChange={(url) => setForm((f) => ({ ...f, midia_url: url }))}
+                  messageId={form.id}
                 />
               </div>
             )}

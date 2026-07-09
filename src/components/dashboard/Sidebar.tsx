@@ -23,6 +23,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import useSWR from "swr";
+
 const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; roles: Perfil[] }[] = [
   {
     href: "/dashboard",
@@ -74,6 +76,14 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useSession();
 
+  // Check if there are errors in the followup queue
+  const { data: errorItems } = useSWR(
+    user?.perfil === "admin" ? "/api/followup/fila?status=erro" : null,
+    (url) => fetch(url).then((r) => r.json()).catch(() => []),
+    { refreshInterval: 15000 }
+  );
+  const hasError = Array.isArray(errorItems) && errorItems.length > 0;
+
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
@@ -112,16 +122,26 @@ export function Sidebar() {
                   <Link
                     href={item.href}
                     className={cn(
-                      "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                      "relative flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                       isActive
                         ? "bg-[#c9a84c]/10 text-[#c9a84c]"
                         : "text-white/60 hover:bg-white/5 hover:text-white"
                     )}
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <div className="relative">
+                      <Icon className="h-5 w-5 shrink-0" />
+                      {item.href === "/dashboard/configuracoes" && hasError && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                      )}
+                    </div>
+                    <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 flex-1">
                       {item.label}
                     </span>
+                    {item.href === "/dashboard/configuracoes" && hasError && (
+                      <span className="hidden group-hover:inline-block rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
+                        erro
+                      </span>
+                    )}
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">{item.label}</TooltipContent>

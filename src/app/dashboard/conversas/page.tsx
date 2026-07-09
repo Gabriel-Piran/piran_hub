@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X } from "lucide-react";
+import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
@@ -62,14 +62,71 @@ function formatAgendado(iso: string): string {
   return `${dia}/${mes} ${hora}:${min}`;
 }
 
+function MessageBubbleContent({
+  mensagem,
+  onOpenLightbox,
+}: {
+  mensagem: Mensagem;
+  onOpenLightbox: (url: string) => void;
+}) {
+  if (mensagem.tipo === "audio" && mensagem.midia_url) {
+    return (
+      <div className="py-1">
+        <audio src={mensagem.midia_url} controls className="max-w-full outline-none" />
+      </div>
+    );
+  }
+
+  if (mensagem.tipo === "imagem" && mensagem.midia_url) {
+    return (
+      <div className="py-1">
+        <img
+          src={mensagem.midia_url}
+          alt="Imagem"
+          className="max-h-60 rounded-md cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => onOpenLightbox(mensagem.midia_url!)}
+        />
+      </div>
+    );
+  }
+
+  if (mensagem.tipo === "documento" && mensagem.midia_url) {
+    return (
+      <div className="py-1 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 min-w-[200px] max-w-sm">
+        <FileText className="h-8 w-8 text-[#c9a84c] shrink-0" />
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm font-medium text-white truncate">
+            {mensagem.conteudo || "Documento"}
+          </span>
+          <span className="text-[10px] text-white/40">Documento</span>
+        </div>
+        <a
+          href={mensagem.midia_url}
+          download
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto flex h-8 w-8 items-center justify-center rounded bg-white/10 hover:bg-white/20 text-white transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Download className="h-4 w-4" />
+        </a>
+      </div>
+    );
+  }
+
+  return <span>{mensagem.conteudo || ""}</span>;
+}
+
 function ChatBubble({
   mensagem,
   leadName,
   onCancelarAgendamento,
+  onOpenLightbox,
 }: {
   mensagem: Mensagem;
   leadName: string;
   onCancelarAgendamento: (id: string) => void;
+  onOpenLightbox: (url: string) => void;
 }) {
   if (mensagem.nota_interna) {
     return (
@@ -84,7 +141,9 @@ function ChatBubble({
     );
   }
 
-  if (mensagem.role === "sistema") {
+  const isMedia = mensagem.tipo === "audio" || mensagem.tipo === "imagem" || mensagem.tipo === "documento";
+
+  if (mensagem.role === "sistema" && !isMedia) {
     return (
       <div className="flex justify-center my-1">
         <span className="rounded-full bg-zinc-200 text-zinc-900 px-3 py-1 text-[11px] font-medium italic shadow-sm">
@@ -94,7 +153,7 @@ function ChatBubble({
     );
   }
 
-  const isAssistente = mensagem.role === "assistente";
+  const isAssistente = mensagem.role === "assistente" || (mensagem.role === "sistema" && isMedia);
   const isLead = mensagem.role === "lead";
 
   if (!isAssistente && !isLead) {
@@ -117,8 +176,11 @@ function ChatBubble({
           <span className="text-[11px] font-medium text-white/50 px-1">
             {leadName || "Lead"}
           </span>
-          <div className="rounded-lg rounded-tl-none bg-zinc-800/80 text-white px-4 py-2.5 text-sm shadow-sm">
-            {mensagem.conteudo || ""}
+          <div className={cn(
+            "rounded-lg rounded-tl-none bg-zinc-800/80 text-white shadow-sm",
+            mensagem.tipo === "audio" ? "p-1.5" : "px-4 py-2.5 text-sm"
+          )}>
+            <MessageBubbleContent mensagem={mensagem} onOpenLightbox={onOpenLightbox} />
             <p className="mt-1 text-[10px] text-white/30 text-right">
               {mensagem.enviado_em
                 ? formatDistanceToNow(new Date(mensagem.enviado_em), {
@@ -159,11 +221,12 @@ function ChatBubble({
         )}
         <div
           className={cn(
-            "rounded-lg rounded-tr-none bg-[#c9a84c]/20 text-white px-4 py-2.5 text-sm shadow-sm border border-[#c9a84c]/10",
+            "rounded-lg rounded-tr-none bg-[#c9a84c]/20 text-white shadow-sm border border-[#c9a84c]/10",
+            mensagem.tipo === "audio" ? "p-1.5" : "px-4 py-2.5 text-sm",
             cancelado && "opacity-40 line-through"
           )}
         >
-          {mensagem.conteudo || ""}
+          <MessageBubbleContent mensagem={mensagem} onOpenLightbox={onOpenLightbox} />
           <p className="mt-1 text-[10px] text-white/30">
             {mensagem.enviado_em
               ? formatDistanceToNow(new Date(mensagem.enviado_em), {
@@ -353,6 +416,16 @@ function ConversationsView() {
   const [scheduleValue, setScheduleValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerIntervalRef = useRef<any>(null);
+
   const iaQuery = `/api/leads?modo_atendimento=ia&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
   const pendenteQuery = `/api/leads?modo_atendimento=pendente&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
   const humanoQuery = `/api/leads?modo_atendimento=humano&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
@@ -424,11 +497,176 @@ function ConversationsView() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lead?.mensagens?.length]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setFilePreviewUrl(url);
+    } else {
+      setFilePreviewUrl(null);
+    }
+  };
+
+  const handleCancelFile = () => {
+    setSelectedFile(null);
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+      setFilePreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [filePreviewUrl]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      
+      let options = { mimeType: "audio/ogg" };
+      if (!MediaRecorder.isTypeSupported("audio/ogg")) {
+        options = { mimeType: "audio/webm" };
+      }
+      
+      const recorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = recorder;
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+      
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: options.mimeType });
+        if (audioBlob.size > 0) {
+          await uploadAudio(audioBlob);
+        }
+      };
+      
+      recorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      timerIntervalRef.current = setInterval(() => {
+        setRecordingTime((t) => t + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error("Erro ao acessar microfone:", err);
+      toast.error("Não foi possível acessar o microfone.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setIsRecording(false);
+  };
+
+  const uploadAudio = async (blob: Blob) => {
+    if (!activeLeadId) return;
+    setSending(true);
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64data = reader.result as string;
+        
+        const res = await fetch("/api/mensagens/midia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lead_id: activeLeadId,
+            tipo: "audio",
+            dados: base64data,
+            mime_type: blob.type,
+            instancia: lead?.instancia || "",
+          }),
+        });
+        
+        if (!res.ok) {
+          const bodyRes = await res.json().catch(() => null);
+          toast.error(bodyRes?.error ?? "Erro ao enviar áudio.");
+          return;
+        }
+        
+        await mutate();
+      };
+    } catch (err) {
+      toast.error("Erro ao processar áudio.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const pressStartTimeRef = useRef<number>(0);
+  const holdTimeoutRef = useRef<any>(null);
+  const isHoldingRef = useRef<boolean>(false);
+
+  const handleMicPress = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    pressStartTimeRef.current = Date.now();
+    isHoldingRef.current = false;
+
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+    }
+
+    holdTimeoutRef.current = setTimeout(() => {
+      isHoldingRef.current = true;
+      if (!isRecording) {
+        startRecording();
+      }
+    }, 450);
+  };
+
+  const handleMicRelease = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+
+    if (isHoldingRef.current) {
+      if (isRecording) {
+        stopRecording();
+      }
+    } else {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+  };
+
   useEffect(() => {
     setNotaMode(false);
     setScheduleOpen(false);
     setScheduleValue("");
     setDraft("");
+    handleCancelFile();
   }, [activeLeadId]);
 
   const quickFiltro = draft.startsWith("/") ? draft.slice(1) : null;
@@ -587,8 +825,39 @@ function ConversationsView() {
   };
 
   const handleSend = async () => {
+    if (!activeLeadId) return;
+
+    if (selectedFile) {
+      setSending(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("lead_id", activeLeadId);
+
+        const res = await fetch("/api/mensagens/midia", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const bodyRes = await res.json().catch(() => null);
+          toast.error(bodyRes?.error ?? "Erro ao enviar arquivo.");
+          return;
+        }
+
+        handleCancelFile();
+        await mutate();
+        return;
+      } catch {
+        toast.error("Erro de conexão ao enviar arquivo.");
+        return;
+      } finally {
+        setSending(false);
+      }
+    }
+
     const conteudo = draft.trim();
-    if (!conteudo || !activeLeadId) return;
+    if (!conteudo) return;
 
     setSending(true);
     try {
@@ -927,6 +1196,7 @@ function ConversationsView() {
                     mensagem={mensagem}
                     leadName={lead.nome}
                     onCancelarAgendamento={handleCancelarAgendamento}
+                    onOpenLightbox={setLightboxUrl}
                   />
                 ))}
                 {shouldShowTyping && <TypingIndicator />}
@@ -948,6 +1218,47 @@ function ConversationsView() {
                       </span>
                     </div>
                   )}
+
+                  {/* File Preview */}
+                  {selectedFile && (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-white/5 max-w-sm mb-2">
+                      {filePreviewUrl ? (
+                        <img src={filePreviewUrl} alt="Preview" className="h-12 w-12 rounded object-cover" />
+                      ) : (
+                        <FileText className="h-8 w-8 text-[#c9a84c] shrink-0" />
+                      )}
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-xs font-medium text-white truncate">{selectedFile.name}</span>
+                        <span className="text-[10px] text-white/40">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                      <button
+                        onClick={handleCancelFile}
+                        className="text-white/50 hover:text-white transition-colors p-1"
+                        aria-label="Cancelar anexo"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Recording overlay / Wave animation */}
+                  {isRecording && (
+                    <div className="flex items-center gap-3 p-2 rounded-lg border border-red-500/20 bg-red-500/5 mb-2 max-w-xs animate-pulse">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                      <span className="text-xs font-semibold text-red-400">Gravando: {recordingTime}s</span>
+                      <div className="flex items-end gap-0.5 h-3 shrink-0">
+                        <span className="w-0.5 bg-red-500 rounded-full animate-[pulse_1s_infinite_100ms] h-2" />
+                        <span className="w-0.5 bg-red-500 rounded-full animate-[pulse_1s_infinite_300ms] h-3" />
+                        <span className="w-0.5 bg-red-500 rounded-full animate-[pulse_1s_infinite_500ms] h-1.5" />
+                        <span className="w-0.5 bg-red-500 rounded-full animate-[pulse_1s_infinite_700ms] h-3" />
+                        <span className="w-0.5 bg-red-500 rounded-full animate-[pulse_1s_infinite_900ms] h-2" />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="relative flex items-center gap-2">
                     {quickFiltro !== null && (
                       <QuickMessagesPopover
@@ -956,6 +1267,16 @@ function ConversationsView() {
                         onSelect={handleSelectQuickMessage}
                       />
                     )}
+
+                    {/* Hidden File Input */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*,application/pdf,.doc,.docx"
+                    />
+
                     <button
                       onClick={() => {
                         setNotaMode((v) => !v);
@@ -971,6 +1292,7 @@ function ConversationsView() {
                     >
                       <StickyNote className="h-4 w-4" />
                     </button>
+
                     <button
                       onClick={() => {
                         setScheduleOpen((v) => !v);
@@ -986,6 +1308,16 @@ function ConversationsView() {
                     >
                       <Clock className="h-4 w-4" />
                     </button>
+
+                    {/* Paperclip Button */}
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-white transition-colors"
+                      aria-label="Anexar arquivo"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </button>
+
                     <input
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
@@ -1005,9 +1337,27 @@ function ConversationsView() {
                           : "border-white/10 bg-[#0f0f0f] focus:ring-[#c9a84c]"
                       )}
                     />
+
+                    {/* Microphone Button */}
+                    <button
+                      onMouseDown={handleMicPress}
+                      onMouseUp={handleMicRelease}
+                      onTouchStart={handleMicPress}
+                      onTouchEnd={handleMicRelease}
+                      className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors",
+                        isRecording
+                          ? "bg-red-500 text-white animate-pulse"
+                          : "text-white/50 hover:bg-white/5 hover:text-white"
+                      )}
+                      aria-label="Gravar áudio"
+                    >
+                      <Mic className="h-4 w-4" />
+                    </button>
+
                     <button
                       onClick={handleSend}
-                      disabled={sending || !draft.trim()}
+                      disabled={sending || (!draft.trim() && !selectedFile)}
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#c9a84c] text-[#0f0f0f] transition-colors hover:bg-[#d9bb63] disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label="Enviar"
                     >
@@ -1030,6 +1380,28 @@ function ConversationsView() {
           )}
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            aria-label="Fechar visualização"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Visualização ampliada"
+            className="max-h-full max-w-full rounded-md object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
