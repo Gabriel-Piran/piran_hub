@@ -105,3 +105,13 @@ export interface Usuario {
   criado_em: string;
   ultimo_acesso: string | null;
 }
+
+export interface PromptAline {
+  id: string;
+  estagio: LeadEstagio;
+  titulo: string;
+  descricao: string | null;
+  conteudo: string;
+  ativo: boolean;
+  atualizado_em: string;
+}

@@ -25,6 +25,7 @@ interface RouteRule {
 // Ordem importa: prefixos mais específicos primeiro.
 const PAGE_RULES: RouteRule[] = [
   { prefix: "/dashboard/configuracoes", roles: ["admin"] },
+  { prefix: "/dashboard/aline", roles: ["admin", "advogado"] },
   { prefix: "/dashboard/contratos", roles: ["admin", "advogado"] },
   { prefix: "/dashboard/perfil", roles: ALL_PERFIS },
   { prefix: "/dashboard/leads", roles: ALL_PERFIS },
@@ -43,6 +44,12 @@ const API_RULES: RouteRule[] = [
   },
   { prefix: "/api/contratos", roles: ["admin", "advogado"] },
   { prefix: "/api/dashboard", roles: ["admin", "advogado"] },
+  {
+    prefix: "/api/prompts",
+    roles: ["admin"],
+    methods: ["PATCH", "POST", "DELETE"],
+  },
+  { prefix: "/api/prompts", roles: ["admin", "advogado"] },
   {
     prefix: "/api/mensagens/enviar",
     roles: ["admin", "advogado", "secretaria"],

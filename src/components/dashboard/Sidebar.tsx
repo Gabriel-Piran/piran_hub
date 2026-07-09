@@ -8,6 +8,7 @@ import {
   LogOut,
   MessageSquare,
   Settings,
+  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -45,6 +46,12 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; ro
     href: "/dashboard/contratos",
     label: "Contratos",
     icon: FileText,
+    roles: ["admin", "advogado"],
+  },
+  {
+    href: "/dashboard/aline",
+    label: "Aline",
+    icon: Sparkles,
     roles: ["admin", "advogado"],
   },
   {
