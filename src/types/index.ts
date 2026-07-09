@@ -1,15 +1,4 @@
-export type LeadEstagio =
-  | "RECEPCAO"
-  | "TRIAGEM_DOMESTICO"
-  | "QUALIFICACAO_SALARIO"
-  | "QUALIFICACAO_TEMPO"
-  | "QUALIFICACAO_SAIDA"
-  | "QUALIFICACAO_DATA"
-  | "PROPOSTA"
-  | "COLETA_RG"
-  | "COLETA_ENDERECO"
-  | "CONTRATO"
-  | "AGUARDANDO";
+export type LeadEstagio = string;
 
 export const LEAD_ESTAGIOS: LeadEstagio[] = [
   "RECEPCAO",
@@ -31,7 +20,8 @@ export type LeadStatus =
   | "ativo"
   | "desqualificado"
   | "contrato_enviado"
-  | "contrato_assinado";
+  | "contrato_assinado"
+  | "arquivado";
 
 export type ModoAtendimento = "ia" | "humano" | "pendente";
 

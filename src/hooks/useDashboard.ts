@@ -113,7 +113,7 @@ export function useLead(id: string | null) {
     id ? `/api/leads/${id}` : null,
     (endpoint: string) => apiFetch<LeadComMensagens>(endpoint),
     {
-      refreshInterval: 5_000,
+      refreshInterval: 3_000,
       onError: (err) => console.error("SWR error:", err),
     }
   );

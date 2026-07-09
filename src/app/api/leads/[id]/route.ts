@@ -77,11 +77,17 @@ export async function PATCH(
     return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
   }
 
-  if (
-    "estagio" in body &&
-    !LEAD_ESTAGIOS.includes(body.estagio as LeadEstagio)
-  ) {
-    return NextResponse.json({ error: "Estágio inválido" }, { status: 400 });
+  if ("estagio" in body) {
+    const supabase = supabaseAdmin();
+    const { data: estagioData } = await supabase
+      .from("estagios_customizados")
+      .select("id")
+      .eq("slug", body.estagio)
+      .maybeSingle();
+
+    if (!estagioData && !LEAD_ESTAGIOS.includes(body.estagio as LeadEstagio)) {
+      return NextResponse.json({ error: "Estágio inválido" }, { status: 400 });
+    }
   }
 
   const validStatus: LeadStatus[] = [
@@ -89,6 +95,7 @@ export async function PATCH(
     "desqualificado",
     "contrato_enviado",
     "contrato_assinado",
+    "arquivado",
   ];
   if ("status" in body && !validStatus.includes(body.status as LeadStatus)) {
     return NextResponse.json({ error: "Status inválido" }, { status: 400 });
