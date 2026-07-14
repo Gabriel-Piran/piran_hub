@@ -650,11 +650,13 @@ function ConversationsView() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
       
-      let options = { mimeType: "audio/ogg" };
-      if (!MediaRecorder.isTypeSupported("audio/ogg")) {
-        options = { mimeType: "audio/webm" };
-      }
-      
+      const mimeType = MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/ogg";
+      const options = { mimeType };
+
       const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
       

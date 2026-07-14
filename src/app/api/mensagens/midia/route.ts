@@ -8,16 +8,19 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig } from "@/lib/zapi";
 
 /**
- * O navegador só consegue gravar em WebM/Opus (MediaRecorder não suporta
- * gerar Ogg nativamente na maioria dos browsers), mas a nota de voz do
- * WhatsApp exige o container Ogg com codec Opus. Sem essa conversão, a
- * Z-API recebe o WebM cru e falha ao converter (ConvertMediaException).
- * Requer o binário `ffmpeg` instalado na imagem (ver Dockerfile).
+ * O navegador grava em WebM/Opus, MP4/AAC (Safari) ou, raramente, Ogg,
+ * dependendo do que o MediaRecorder suporta — nunca MP3. A Z-API só tem
+ * suporte documentado e confirmado para MP3 (o único exemplo funcional na
+ * doc oficial usa "data:audio/mpeg;base64,..."); enviar outros containers
+ * crus faz a conversão deles falhar (ConvertMediaException). Por isso o
+ * áudio é sempre transcodificado para MP3 aqui, independente do formato
+ * gravado no browser. Requer o binário `ffmpeg` instalado na imagem (ver
+ * Dockerfile).
  */
-async function transcodeToOggOpus(input: Buffer): Promise<Buffer> {
+async function transcodeToMp3(input: Buffer): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), "audio-"));
   const inputPath = join(dir, "input");
-  const outputPath = join(dir, "output.ogg");
+  const outputPath = join(dir, "output.mp3");
 
   try {
     await writeFile(inputPath, input);
@@ -26,7 +29,7 @@ async function transcodeToOggOpus(input: Buffer): Promise<Buffer> {
       const ffmpeg = spawn("ffmpeg", [
         "-y",
         "-i", inputPath,
-        "-c:a", "libopus",
+        "-c:a", "libmp3lame",
         "-b:a", "32k",
         "-ac", "1",
         "-ar", "16000",
@@ -90,17 +93,17 @@ export async function POST(request: Request) {
       const rawBuffer = Buffer.from(cleanBase64, "base64");
 
       try {
-        fileBuffer = await transcodeToOggOpus(rawBuffer);
+        fileBuffer = await transcodeToMp3(rawBuffer);
       } catch (err) {
         return NextResponse.json(
           { error: `Falha ao converter o áudio gravado: ${(err as Error).message}` },
           { status: 500 }
         );
       }
-      fileMimeType = "audio/ogg";
+      fileMimeType = "audio/mpeg";
 
       const timestamp = Date.now();
-      fileName = `${timestamp}.ogg`;
+      fileName = `${timestamp}.mp3`;
       path = `audios/${leadId}/${fileName}`;
 
     } else if (contentType.includes("multipart/form-data")) {
@@ -165,7 +168,7 @@ export async function POST(request: Request) {
       zapiBody = {
         phone: lead.numero_whatsapp,
         audio: url_publica,
-        extension: "ogg",
+        extension: "mp3",
       };
     } else if (tipo === "imagem") {
       zapiPath = "send-image";
