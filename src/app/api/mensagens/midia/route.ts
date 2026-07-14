@@ -218,7 +218,10 @@ export async function POST(request: Request) {
         caption: "",
       };
     } else {
-      zapiPath = "send-document";
+      // A Z-API exige a extensão do documento no path, ex.: /send-document/pdf
+      // — sem isso o endpoint rejeita o envio.
+      const documentExtension = fileName.split(".").pop()?.toLowerCase() || "pdf";
+      zapiPath = `send-document/${documentExtension}`;
       zapiBody = {
         phone: lead.numero_whatsapp,
         document: url_publica,
