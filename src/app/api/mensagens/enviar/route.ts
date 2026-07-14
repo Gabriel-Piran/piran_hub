@@ -70,8 +70,9 @@ export async function POST(request: Request) {
       role: "sistema",
       tipo,
       enviado_em: new Date().toISOString(),
+      enviado_por_atendente: true,
     })
-    .select("id, lead_id, conteudo, role, tipo, enviado_em")
+    .select("id, lead_id, conteudo, role, tipo, enviado_em, enviado_por_atendente")
     .single();
 
   if (saveError) {

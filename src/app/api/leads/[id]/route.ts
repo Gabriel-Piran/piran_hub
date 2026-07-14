@@ -56,7 +56,7 @@ export async function GET(
   const { data: mensagens, error: mensagensError } = await supabase
     .from("mensagens")
     .select(
-      "id, lead_id, conteudo, role, tipo, enviado_em, agendado_para, nota_interna, acao_executada"
+      "id, lead_id, conteudo, role, tipo, enviado_em, agendado_para, nota_interna, acao_executada, enviado_por_atendente, midia_url"
     )
     .eq("lead_id", id)
     .order("enviado_em", { ascending: true });

@@ -32,6 +32,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: itemsError.message }, { status: 500 });
   }
 
+  // Debug: quantos itens estão na fila no total vs. quantos foram pegos
+  // agora, para diagnosticar por que o follow-up "não dispara" — a causa
+  // mais comum é agendado_para no futuro ou tentativas já esgotadas.
+  const { count: totalNaFila } = await supabase
+    .from("followup_fila")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pendente");
+
   const enviados: any[] = [];
 
   for (const item of items ?? []) {
@@ -153,5 +161,12 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ enviados });
+  return NextResponse.json({
+    enviados,
+    debug: {
+      pendentes_no_total: totalNaFila ?? 0,
+      pegos_nesta_execucao: (items ?? []).length,
+      ids_pegos: (items ?? []).map((i) => i.id),
+    },
+  });
 }

@@ -33,8 +33,9 @@ export async function POST(request: Request) {
       enviado_em: new Date().toISOString(),
       agendado_para: agendadoPara,
       nota_interna: notaInterna,
+      enviado_por_atendente: !notaInterna,
     })
-    .select(COLUMNS)
+    .select(`${COLUMNS}, enviado_por_atendente`)
     .single();
 
   if (error) {

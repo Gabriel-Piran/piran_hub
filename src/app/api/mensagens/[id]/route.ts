@@ -11,19 +11,34 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  const acaoExecutada = body?.acao_executada;
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Corpo inválido" }, { status: 400 });
+  }
 
-  if (acaoExecutada !== "cancelado") {
-    return NextResponse.json(
-      { error: "acao_executada deve ser 'cancelado'" },
-      { status: 400 }
-    );
+  const updates: Record<string, unknown> = {};
+
+  if ("acao_executada" in body) {
+    if (body.acao_executada !== "cancelado") {
+      return NextResponse.json(
+        { error: "acao_executada deve ser 'cancelado'" },
+        { status: 400 }
+      );
+    }
+    updates.acao_executada = "cancelado";
+  }
+
+  // Edição de mensagem agendada (texto e/ou horário) ainda não enviada.
+  if ("conteudo" in body) updates.conteudo = String(body.conteudo ?? "").trim();
+  if ("agendado_para" in body) updates.agendado_para = body.agendado_para;
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: "Nada para atualizar" }, { status: 400 });
   }
 
   const supabase = supabaseAdmin();
   const { data, error } = await supabase
     .from("mensagens")
-    .update({ acao_executada: "cancelado" })
+    .update(updates)
     .eq("id", id)
     .is("acao_executada", null)
     .select(COLUMNS)

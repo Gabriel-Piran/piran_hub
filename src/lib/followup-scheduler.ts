@@ -1,5 +1,62 @@
 import { supabaseAdmin } from "./supabase";
 
+/**
+ * Encontra leads elegíveis para uma regra (no estágio-gatilho, parados há
+ * dias_espera ou mais, ativos, e que ainda não receberam/estão na fila para
+ * essa regra) e agenda o follow-up para eles. Usado tanto pelo endpoint
+ * manual POST /api/followup/agendar quanto pela verificação automática de
+ * todas as regras em GET /api/followup/verificar-regras.
+ */
+export async function agendarFollowupsParaRegra(regraId: string): Promise<number> {
+  const supabase = supabaseAdmin();
+
+  const { data: regra, error: errorRegra } = await supabase
+    .from("followup_regras")
+    .select("*")
+    .eq("id", regraId)
+    .single();
+
+  if (errorRegra || !regra) {
+    throw new Error(`Regra ${regraId} não encontrada: ${errorRegra?.message}`);
+  }
+
+  const limite = new Date();
+  limite.setDate(limite.getDate() - regra.dias_espera);
+
+  const { data: leads, error: leadsError } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("estagio", regra.estagio_gatilho)
+    .lte("atualizado_em", limite.toISOString())
+    .eq("status", "ativo");
+
+  if (leadsError) {
+    throw new Error(leadsError.message);
+  }
+  if (!leads || leads.length === 0) return 0;
+
+  const { data: sent } = await supabase
+    .from("followups_enviados")
+    .select("lead_id")
+    .eq("regra_id", regraId);
+  const sentLeadIds = new Set((sent ?? []).map((s) => s.lead_id));
+
+  const { data: queued } = await supabase
+    .from("followup_fila")
+    .select("lead_id")
+    .eq("regra_id", regraId)
+    .in("status", ["pendente", "enviado"]);
+  const queuedLeadIds = new Set((queued ?? []).map((q) => q.lead_id));
+
+  const eligibleLeadIds = leads
+    .map((l) => l.id)
+    .filter((id) => !sentLeadIds.has(id) && !queuedLeadIds.has(id));
+
+  if (eligibleLeadIds.length === 0) return 0;
+
+  return scheduleFollowups(eligibleLeadIds, regraId);
+}
+
 export async function scheduleFollowups(leadIds: string[], regraId: string): Promise<number> {
   if (!leadIds || leadIds.length === 0) return 0;
 

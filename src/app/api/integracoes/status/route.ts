@@ -9,16 +9,22 @@ async function fetchStatus(instancia: ZapiInstancia) {
   const zapi = zapiConfig(instancia);
   if (!zapi) return { instancia, connected: false, configured: false };
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+
   try {
     const res = await fetch(`${zapi.baseUrl}/status`, {
       headers: zapi.headers,
       cache: "no-store",
+      signal: controller.signal,
     });
     if (!res.ok) return { instancia, connected: false, configured: true };
     const data = await res.json();
     return { instancia, connected: Boolean(data?.connected), configured: true };
   } catch {
     return { instancia, connected: false, configured: true };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

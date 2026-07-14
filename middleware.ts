@@ -93,7 +93,12 @@ const API_RULES: RouteRule[] = [
   { prefix: "/api/departamentos", roles: ALL_PERFIS },
 ];
 
-const CRON_SECRET_ROUTES = ["/api/followup-processar", "/api/mensagens/agendadas"];
+const CRON_SECRET_ROUTES = [
+  "/api/followup-processar",
+  "/api/mensagens/agendadas",
+  "/api/followup/processar",
+  "/api/followup/verificar-regras",
+];
 
 function matchRule(rules: RouteRule[], pathname: string, method: string) {
   return rules.find((rule) => {

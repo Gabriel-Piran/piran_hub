@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download } from "lucide-react";
+import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
@@ -76,6 +76,93 @@ function formatAgendado(iso: string): string {
   const hora = String(date.getHours()).padStart(2, "0");
   const min = String(date.getMinutes()).padStart(2, "0");
   return `${dia}/${mes} ${hora}:${min}`;
+}
+
+function formatAgendadoAmigavel(iso: string): string {
+  const date = new Date(iso);
+  const hora = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+
+  const hoje = new Date();
+  const amanha = new Date(hoje);
+  amanha.setDate(hoje.getDate() + 1);
+
+  const mesmoDia = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  if (mesmoDia(date, hoje)) return `hoje às ${hora}:${min}`;
+  if (mesmoDia(date, amanha)) return `amanhã às ${hora}:${min}`;
+  return formatAgendado(iso);
+}
+
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function MensagensAgendadasPanel({
+  mensagens,
+  onCancelar,
+  onEditar,
+}: {
+  mensagens: Mensagem[];
+  onCancelar: (id: string) => void;
+  onEditar: (mensagem: Mensagem) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-t border-white/10">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-6 py-3 text-left text-sm font-medium text-white/70 hover:bg-white/5"
+      >
+        <Clock className="h-4 w-4 text-orange-400" />
+        <span>Mensagens Agendadas ({mensagens.length})</span>
+        <span className="ml-auto text-xs text-white/30">{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-2 px-6 pb-4">
+          {mensagens.length === 0 && (
+            <p className="text-xs text-white/40">Nenhuma mensagem agendada para este lead.</p>
+          )}
+          {mensagens.map((m) => (
+            <div
+              key={m.id}
+              className="flex items-center gap-3 rounded-md border border-orange-500/20 bg-orange-500/5 px-3 py-2"
+            >
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-xs text-white/80">
+                  {(m.conteudo || "").slice(0, 50)}
+                  {(m.conteudo || "").length > 50 ? "..." : ""}
+                </span>
+                <Badge className="w-fit gap-1 border-orange-500/40 bg-orange-500/10 text-orange-400 text-[10px]">
+                  <Clock className="h-3 w-3" />
+                  Aguardando envio {m.agendado_para ? formatAgendadoAmigavel(m.agendado_para) : ""}
+                </Badge>
+              </div>
+              <button
+                onClick={() => onEditar(m)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-white"
+                aria-label="Editar mensagem agendada"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => onCancelar(m.id)}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
+                aria-label="Cancelar mensagem agendada"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MessageBubbleContent({
@@ -158,8 +245,12 @@ function ChatBubble({
   }
 
   const isMedia = mensagem.tipo === "audio" || mensagem.tipo === "imagem" || mensagem.tipo === "documento";
+  const isTextoDeAtendente = mensagem.role === "sistema" && mensagem.enviado_por_atendente === true;
 
-  if (mensagem.role === "sistema" && !isMedia) {
+  // Só é notificação de sistema (pílula centralizada) quando não é mídia nem
+  // texto enviado pelo atendente — texto de atendente/IA precisa aparecer
+  // como balão de conversa, senão fica "invisível"/parece uma data solta.
+  if (mensagem.role === "sistema" && !isMedia && !isTextoDeAtendente) {
     return (
       <div className="flex justify-center my-1">
         <span className="rounded-full bg-zinc-200 text-zinc-900 px-3 py-1 text-[11px] font-medium italic shadow-sm">
@@ -169,7 +260,8 @@ function ChatBubble({
     );
   }
 
-  const isAssistente = mensagem.role === "assistente" || (mensagem.role === "sistema" && isMedia);
+  const isAssistente =
+    mensagem.role === "assistente" || (mensagem.role === "sistema" && (isMedia || isTextoDeAtendente));
   const isLead = mensagem.role === "lead";
 
   if (!isAssistente && !isLead) {
@@ -216,7 +308,7 @@ function ChatBubble({
     <div className="flex items-start gap-2.5 my-2 justify-end">
       <div className="flex flex-col gap-1 items-end max-w-[70%]">
         <span className="text-[11px] font-medium text-[#c9a84c] px-1">
-          Aline
+          {isTextoDeAtendente ? "Você" : "Aline"}
         </span>
         {mensagem.agendado_para && (
           <div className="flex items-center gap-2 mb-1">
@@ -517,6 +609,11 @@ function ConversationsView() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
+  const [editandoAgendada, setEditandoAgendada] = useState<Mensagem | null>(null);
+  const [editConteudo, setEditConteudo] = useState("");
+  const [editDataHora, setEditDataHora] = useState("");
+  const [savingEdicao, setSavingEdicao] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -615,6 +712,48 @@ function ConversationsView() {
     }
     return map;
   }, [estagios]);
+
+  const mensagensAgendadas = useMemo(
+    () => (lead?.mensagens ?? []).filter((m) => m.agendado_para && !m.acao_executada),
+    [lead]
+  );
+
+  const abrirEdicaoAgendada = (mensagem: Mensagem) => {
+    setEditandoAgendada(mensagem);
+    setEditConteudo(mensagem.conteudo);
+    setEditDataHora(mensagem.agendado_para ? toDatetimeLocalValue(mensagem.agendado_para) : "");
+  };
+
+  const salvarEdicaoAgendada = async () => {
+    if (!editandoAgendada) return;
+    if (!editConteudo.trim() || !editDataHora) {
+      toast.error("Preencha o texto e a data/hora da mensagem.");
+      return;
+    }
+    setSavingEdicao(true);
+    try {
+      const res = await fetch(`/api/mensagens/${editandoAgendada.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conteudo: editConteudo.trim(),
+          agendado_para: new Date(editDataHora).toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast.error(body?.error ?? "Não foi possível salvar a mensagem agendada.");
+        return;
+      }
+      setEditandoAgendada(null);
+      await mutate();
+      toast.success("Mensagem agendada atualizada.");
+    } catch {
+      toast.error("Erro de conexão ao salvar a mensagem agendada.");
+    } finally {
+      setSavingEdicao(false);
+    }
+  };
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -1035,7 +1174,11 @@ function ConversationsView() {
         return;
       }
 
-      if (scheduleOpen && scheduleValue) {
+      if (scheduleOpen) {
+        if (!scheduleValue) {
+          toast.error("Selecione data e hora para agendar o envio.");
+          return;
+        }
         const agendadoPara = new Date(scheduleValue).toISOString();
         const res = await fetch("/api/mensagens", {
           method: "POST",
@@ -1376,6 +1519,12 @@ function ConversationsView() {
                 {shouldShowTyping && <TypingIndicator />}
               </div>
 
+              <MensagensAgendadasPanel
+                mensagens={mensagensAgendadas}
+                onCancelar={handleCancelarAgendamento}
+                onEditar={abrirEdicaoAgendada}
+              />
+
               {/* Message Input */}
               {podeEnviar ? (
                 <div className="flex flex-col gap-2 border-t border-white/10 px-6 py-4">
@@ -1387,6 +1536,14 @@ function ConversationsView() {
                         onChange={(e) => setScheduleValue(e.target.value)}
                         className="rounded-md border border-orange-500/30 bg-[#0f0f0f] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
+                      <Button
+                        size="sm"
+                        disabled={sending || !scheduleValue || !draft.trim()}
+                        className="bg-orange-500 text-white hover:bg-orange-600"
+                        onClick={handleSend}
+                      >
+                        Agendar envio
+                      </Button>
                       <span className="text-xs text-white/40">
                         A mensagem será enviada automaticamente nesse horário.
                       </span>
@@ -1597,6 +1754,39 @@ function ConversationsView() {
               onClick={handleResetConversa}
             >
               {resetting ? "Resetando..." : "Resetar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!editandoAgendada}
+        onOpenChange={(open) => !open && setEditandoAgendada(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar mensagem agendada</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <textarea
+              value={editConteudo}
+              onChange={(e) => setEditConteudo(e.target.value)}
+              rows={4}
+              className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+            />
+            <input
+              type="datetime-local"
+              value={editDataHora}
+              onChange={(e) => setEditDataHora(e.target.value)}
+              className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditandoAgendada(null)}>
+              Cancelar
+            </Button>
+            <Button disabled={savingEdicao} onClick={salvarEdicaoAgendada}>
+              {savingEdicao ? "Salvando..." : "Salvar"}
             </Button>
           </div>
         </DialogContent>

@@ -58,7 +58,7 @@ export interface Lead {
 
 export type MensagemRole = "lead" | "assistente" | "sistema";
 export type MensagemTipo = "texto" | "audio" | "imagem" | "documento";
-export type MensagemAcaoExecutada = "enviado" | "cancelado" | null;
+export type MensagemAcaoExecutada = "enviado" | "cancelado" | "ignorado" | null;
 
 export interface Mensagem {
   id: string;
@@ -74,6 +74,7 @@ export interface Mensagem {
   acao_executada?: MensagemAcaoExecutada;
   departamento_id?: string | null;
   midia_url?: string | null;
+  enviado_por_atendente?: boolean;
 }
 
 export interface Departamento {

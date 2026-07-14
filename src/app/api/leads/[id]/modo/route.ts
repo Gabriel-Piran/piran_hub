@@ -33,6 +33,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   }
 
+  if (modo === "ia") {
+    // Mensagens do lead que chegaram durante o atendimento humano/pendente e
+    // ainda não foram processadas não devem ser respondidas retroativamente
+    // pela IA quando o modo volta para "ia" — marca como ignorado para o
+    // Fluxo 03 do n8n não pegá-las na fila de processamento.
+    await supabase
+      .from("mensagens")
+      .update({ acao_executada: "ignorado" })
+      .eq("lead_id", id)
+      .eq("role", "lead")
+      .is("acao_executada", null);
+  }
+
   if (modo === "pendente") {
     await supabase.from("mensagens").insert({
       lead_id: id,
