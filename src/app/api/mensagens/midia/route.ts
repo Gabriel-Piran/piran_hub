@@ -2,6 +2,22 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig } from "@/lib/zapi";
 
+/**
+ * Z-API converte o áudio no servidor deles com base na extensão informada;
+ * se ela não bater com o formato real dos bytes gravados (webm/opus quando
+ * o navegador não suporta o mimeType "audio/ogg" no MediaRecorder), a
+ * conversão falha (ConvertMediaException). Por isso a extensão precisa ser
+ * derivada do mime type real, nunca fixa em "ogg".
+ */
+function audioExtensionFromMime(mimeType: string): string {
+  const base = mimeType.split(";")[0].trim().toLowerCase();
+  if (base === "audio/webm") return "webm";
+  if (base === "audio/mp4" || base === "audio/aac") return "mp4";
+  if (base === "audio/mpeg") return "mp3";
+  if (base === "audio/wav" || base === "audio/x-wav") return "wav";
+  return "ogg";
+}
+
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") || "";
@@ -40,9 +56,10 @@ export async function POST(request: Request) {
       // Decodifica base64
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
       fileBuffer = Buffer.from(cleanBase64, "base64");
-      
+
       const timestamp = Date.now();
-      fileName = `${timestamp}.ogg`;
+      const audioExtension = audioExtensionFromMime(fileMimeType);
+      fileName = `${timestamp}.${audioExtension}`;
       path = `audios/${leadId}/${fileName}`;
 
     } else if (contentType.includes("multipart/form-data")) {
@@ -107,7 +124,7 @@ export async function POST(request: Request) {
       zapiBody = {
         phone: lead.numero_whatsapp,
         audio: url_publica,
-        extension: "ogg",
+        extension: audioExtensionFromMime(fileMimeType),
       };
     } else if (tipo === "imagem") {
       zapiPath = "send-image";
