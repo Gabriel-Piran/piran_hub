@@ -53,6 +53,23 @@ async function transcodeToMp3(input: Buffer): Promise<Buffer> {
   }
 }
 
+/**
+ * Garante que o bucket 'midias' existe e é público. Sem isso, a URL gerada
+ * por getPublicUrl() aponta para um arquivo inacessível (404/403), e a
+ * Z-API recebe uma página de erro em vez de áudio ao tentar buscá-la —
+ * o que aparece como "Fail to convert audio" sem indicar a causa real.
+ */
+async function ensureMidiasBucketPublico(supabase: ReturnType<typeof supabaseAdmin>) {
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const bucket = buckets?.find((b) => b.name === "midias");
+
+  if (!bucket) {
+    await supabase.storage.createBucket("midias", { public: true });
+  } else if (!bucket.public) {
+    await supabase.storage.updateBucket("midias", { public: true });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get("content-type") || "";
@@ -62,6 +79,8 @@ export async function POST(request: Request) {
     if (!zapi) {
       return NextResponse.json({ error: "Z-API não configurada" }, { status: 500 });
     }
+
+    await ensureMidiasBucketPublico(supabase);
 
     let leadId = "";
     let tipo = "";
@@ -147,6 +166,27 @@ export async function POST(request: Request) {
 
     // Obter URL pública
     const url_publica = supabase.storage.from("midias").getPublicUrl(path).data.publicUrl;
+
+    // Confirma que a URL pública é de fato acessível antes de repassar à
+    // Z-API — se o bucket estiver privado ou a política de acesso bloquear,
+    // é melhor falhar aqui com um erro claro do que deixar a Z-API tentar
+    // "converter" uma página de erro.
+    try {
+      const urlCheck = await fetch(url_publica, { method: "GET", cache: "no-store" });
+      if (!urlCheck.ok) {
+        return NextResponse.json(
+          {
+            error: `Arquivo enviado ao Storage não está acessível publicamente (status ${urlCheck.status}). Verifique se o bucket 'midias' está marcado como público.`,
+          },
+          { status: 502 }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "Não foi possível acessar a URL pública do arquivo enviado ao Storage." },
+        { status: 502 }
+      );
+    }
 
     // 2) Buscar telefone do lead
     const { data: lead, error: leadError } = await supabase
