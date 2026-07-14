@@ -974,7 +974,7 @@ function ConversationsView() {
   const handleSend = async () => {
     if (!activeLeadId) return;
 
-    if (draft.trim().toLowerCase() === "/reset") {
+    if (draft.trim().toLowerCase() === "/resetar") {
       setResetConfirmOpen(true);
       return;
     }
