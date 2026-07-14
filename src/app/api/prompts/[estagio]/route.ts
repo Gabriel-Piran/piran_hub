@@ -52,10 +52,14 @@ export async function PATCH(
     .update(updates)
     .eq("estagio", estagio)
     .select(PROMPT_COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Prompt não encontrado para esse estágio" }, { status: 404 });
   }
 
   const sincronizado = await notificarN8n();

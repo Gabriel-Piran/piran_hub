@@ -27,10 +27,17 @@ export async function PATCH(
     .eq("id", id)
     .is("acao_executada", null)
     .select(COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { error: "Mensagem não encontrada ou já processada" },
+      { status: 404 }
+    );
   }
 
   return NextResponse.json(data);

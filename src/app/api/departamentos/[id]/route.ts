@@ -26,10 +26,14 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .select(COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Departamento não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json(data);

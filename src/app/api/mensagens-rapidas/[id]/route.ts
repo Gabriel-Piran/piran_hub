@@ -38,13 +38,17 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .select(COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     const status = error.code === "23505" ? 409 : 500;
     const message =
       error.code === "23505" ? "Já existe uma mensagem com esse atalho" : error.message;
     return NextResponse.json({ error: message }, { status });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Mensagem rápida não encontrada" }, { status: 404 });
   }
 
   return NextResponse.json(data);

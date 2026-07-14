@@ -28,12 +28,16 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .select(COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     const status = error.code === "23505" ? 409 : 500;
     const message = error.code === "23505" ? "Já existe um estágio com esse slug" : error.message;
     return NextResponse.json({ error: message }, { status });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Estágio não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json(data);

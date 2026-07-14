@@ -23,10 +23,14 @@ export async function PATCH(
     .update({ modo_atendimento: modo, atualizado_em: new Date().toISOString() })
     .eq("id", id)
     .select("id, nome, modo_atendimento")
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   }
 
   if (modo === "pendente") {

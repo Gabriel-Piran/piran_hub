@@ -72,10 +72,13 @@ export async function PATCH(request: Request) {
         .update({ status: "cancelado" })
         .eq("id", id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      if (!data) {
+        return NextResponse.json({ error: "Item da fila não encontrado" }, { status: 404 });
       }
       return NextResponse.json(data);
     }
@@ -91,10 +94,13 @@ export async function PATCH(request: Request) {
         })
         .eq("id", id)
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      if (!data) {
+        return NextResponse.json({ error: "Item da fila não encontrado" }, { status: 404 });
       }
       return NextResponse.json(data);
     }

@@ -58,12 +58,16 @@ export async function PATCH(
     .update(updates)
     .eq("id", id)
     .select(USUARIO_COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     const status = error.code === "23505" ? 409 : 500;
     const message = error.code === "23505" ? "Já existe um usuário com esse email" : error.message;
     return NextResponse.json({ error: message }, { status });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json(data);

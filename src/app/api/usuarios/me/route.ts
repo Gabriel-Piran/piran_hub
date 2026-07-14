@@ -16,10 +16,14 @@ export async function GET(request: Request) {
     .from("usuarios")
     .select(USUARIO_COLUMNS)
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json(data);
@@ -81,12 +85,16 @@ export async function PATCH(request: Request) {
     .update(updates)
     .eq("id", userId)
     .select(USUARIO_COLUMNS)
-    .single();
+    .maybeSingle();
 
   if (error) {
     const status = error.code === "23505" ? 409 : 500;
     const message = error.code === "23505" ? "Já existe um usuário com esse email" : error.message;
     return NextResponse.json({ error: message }, { status });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json(data);
