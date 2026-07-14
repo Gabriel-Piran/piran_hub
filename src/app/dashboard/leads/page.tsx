@@ -1,52 +1,89 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Search } from "lucide-react";
+import { Suspense, useMemo, useState } from "react";
+import { LayoutGrid, List, Search } from "lucide-react";
+import useSWR from "swr";
 
-import { useDepartamentos, useEstagios, useLeads } from "@/hooks/useDashboard";
-import { ESTAGIO_LABELS } from "@/lib/labels";
-import { LEAD_ESTAGIOS } from "@/types";
-import type { Lead, LeadEstagio } from "@/types";
-import { Badge } from "@/components/ui/badge";
+import { apiFetch } from "@/lib/api";
+import { mockLeads } from "@/lib/mock-data";
+import { useLeadsFiltros } from "@/hooks/useLeadsFiltros";
+import type { Lead } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
 import { LeadDetailSheet } from "@/components/dashboard/LeadDetailSheet";
+import { FiltrosButton, FiltrosPanel } from "@/components/dashboard/FiltrosPanel";
+import { BulkActionBar } from "@/components/dashboard/BulkActionBar";
+import { LeadsKanban } from "@/components/dashboard/LeadsKanban";
+import { LeadsListView } from "@/components/dashboard/LeadsListView";
 
-type EstagioFilter = "TODOS" | LeadEstagio;
+type ViewMode = "kanban" | "lista";
 
-function LeadsTable() {
-  const { leads, isLoading } = useLeads();
-  const { departamentos } = useDepartamentos();
-  const { estagios } = useEstagios();
+function LeadsPageContent() {
+  const { filtros, aplicarFiltros, limparFiltros, totalAtivos, queryString } =
+    useLeadsFiltros("leads");
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [estagioFilter, setEstagioFilter] = useState<EstagioFilter>("TODOS");
-  const [departamentoFilter, setDepartamentoFilter] = useState<string>("TODOS");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "lista";
+    const saved = window.localStorage.getItem("piran_hub_leads_view");
+    return saved === "kanban" || saved === "lista" ? saved : "lista";
+  });
 
+  const setViewPersist = (v: ViewMode) => {
+    setView(v);
+    if (typeof window !== "undefined") window.localStorage.setItem("piran_hub_leads_view", v);
+  };
+
+  const endpoint = `/api/leads${queryString ? `?${queryString}` : "?status=ativo"}`;
+  const { data, isLoading, mutate } = useSWR<Lead[]>(
+    endpoint,
+    (url: string) => apiFetch<Lead[]>(url).catch(() => mockLeads),
+    { refreshInterval: 30_000, onError: (err) => console.error("SWR error:", err) }
+  );
   const filteredLeads = useMemo(() => {
+    const leads = Array.isArray(data) ? data : [];
     const term = search.trim().toLowerCase();
-    return leads
-      .filter((lead) => estagioFilter === "TODOS" || lead.estagio === estagioFilter)
-      .filter(
-        (lead) =>
-          departamentoFilter === "TODOS" || lead.departamento_id === departamentoFilter
-      )
-      .filter(
-        (lead) =>
-          term === "" ||
-          String(lead.nome || "").toLowerCase().includes(term) ||
-          String(lead.numero_whatsapp || "").toLowerCase().includes(term)
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime()
-      );
-  }, [leads, search, estagioFilter, departamentoFilter]);
+    if (!term) return leads;
+    return leads.filter(
+      (lead) =>
+        String(lead.nome || "").toLowerCase().includes(term) ||
+        String(lead.numero_whatsapp || "").toLowerCase().includes(term)
+    );
+  }, [data, search]);
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectMany = (ids: string[], checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 p-6">
+      <BulkActionBar
+        selectedIds={Array.from(selectedIds)}
+        onClear={() => setSelectedIds(new Set())}
+        onDone={() => {
+          setSelectedIds(new Set());
+          mutate();
+        }}
+      />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex flex-1 items-center gap-2 rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 sm:max-w-xs">
           <Search className="h-4 w-4 shrink-0 text-white/40" />
@@ -59,106 +96,70 @@ function LeadsTable() {
           />
         </div>
 
-        <select
-          value={estagioFilter}
-          onChange={(e) => setEstagioFilter(e.target.value as EstagioFilter)}
-          className="rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
-        >
-          <option value="TODOS">Todos os estágios</option>
-          {estagios.length > 0
-            ? estagios.map((estagio) => (
-                <option key={estagio.id} value={estagio.slug}>
-                  {estagio.nome}
-                </option>
-              ))
-            : LEAD_ESTAGIOS.map((estagio) => (
-                <option key={estagio} value={estagio}>
-                  {ESTAGIO_LABELS[estagio]}
-                </option>
-              ))}
-        </select>
+        <FiltrosButton totalAtivos={totalAtivos} onClick={() => setFiltrosOpen(true)} />
 
-        <select
-          value={departamentoFilter}
-          onChange={(e) => setDepartamentoFilter(e.target.value)}
-          className="rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
-        >
-          <option value="TODOS">Todos os departamentos</option>
-          {departamentos.map((dep) => (
-            <option key={dep.id} value={dep.id}>
-              {dep.nome}
-            </option>
+        <div className="ml-auto flex items-center gap-1 rounded-md border border-white/10 bg-[#1a1a1a] p-1">
+          <button
+            onClick={() => setViewPersist("kanban")}
+            className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === "kanban" ? "bg-[#c9a84c] text-[#0f0f0f]" : "text-white/60 hover:text-white"
+            }`}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Kanban
+          </button>
+          <button
+            onClick={() => setViewPersist("lista")}
+            className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === "lista" ? "bg-[#c9a84c] text-[#0f0f0f]" : "text-white/60 hover:text-white"
+            }`}
+          >
+            <List className="h-3.5 w-3.5" />
+            Lista
+          </button>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
           ))}
-        </select>
-      </div>
+        </div>
+      )}
 
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/10 text-xs uppercase tracking-wide text-white/40">
-              <th className="px-4 py-3 font-medium">Nome</th>
-              <th className="px-4 py-3 font-medium">WhatsApp</th>
-              <th className="px-4 py-3 font-medium">Estágio</th>
-              <th className="px-4 py-3 font-medium">Origem</th>
-              <th className="px-4 py-3 font-medium">Atualizado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading &&
-              Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i} className="border-b border-white/5">
-                  <td className="px-4 py-3" colSpan={5}>
-                    <Skeleton className="h-5 w-full" />
-                  </td>
-                </tr>
-              ))}
+      {!isLoading && view === "kanban" && (
+        <LeadsKanban
+          leads={filteredLeads}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectMany={toggleSelectMany}
+          onOpenLead={setSelectedLead}
+          onMutate={() => mutate()}
+        />
+      )}
 
-            {!isLoading &&
-              filteredLeads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  onClick={() => setSelectedLead(lead)}
-                  className="cursor-pointer border-b border-white/5 transition-colors last:border-0 hover:bg-white/5"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    {lead.nome}
-                  </td>
-                  <td className="px-4 py-3 text-white/60">
-                    {lead.numero_whatsapp}
-                  </td>
-                  <td className="px-4 py-3 text-white/60">
-                    {ESTAGIO_LABELS[lead.estagio]}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      variant={lead.instancia === "ads" ? "ads" : "indicacoes"}
-                    >
-                      {lead.instancia}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-white/40">
-                    {formatDistanceToNow(new Date(lead.atualizado_em), {
-                      addSuffix: true,
-                      locale: ptBR,
-                    })}
-                  </td>
-                </tr>
-              ))}
-
-            {!isLoading && filteredLeads.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-white/40">
-                  Nenhum lead encontrado.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {!isLoading && view === "lista" && (
+        <LeadsListView
+          leads={filteredLeads}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectMany={toggleSelectMany}
+          onOpenLead={setSelectedLead}
+        />
+      )}
 
       <LeadDetailSheet
         lead={selectedLead}
         onOpenChange={(open) => !open && setSelectedLead(null)}
+      />
+
+      <FiltrosPanel
+        open={filtrosOpen}
+        onOpenChange={setFiltrosOpen}
+        filtros={filtros}
+        onAplicar={aplicarFiltros}
+        onLimpar={limparFiltros}
       />
     </div>
   );
@@ -166,10 +167,10 @@ function LeadsTable() {
 
 export default function LeadsPage() {
   return (
-    <div className="p-6">
-      <ErrorBoundary label="a lista de leads">
-        <LeadsTable />
-      </ErrorBoundary>
-    </div>
+    <ErrorBoundary label="a lista de leads">
+      <Suspense fallback={<div className="p-6"><Skeleton className="h-12 w-full" /></div>}>
+        <LeadsPageContent />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

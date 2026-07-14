@@ -37,6 +37,7 @@ const API_RULES: RouteRule[] = [
   { prefix: "/api/usuarios/me", roles: ALL_PERFIS },
   { prefix: "/api/usuarios", roles: ["admin"] },
   { prefix: "/api/configuracoes/whatsapp-status", roles: ["admin"] },
+  { prefix: "/api/integracoes", roles: ["admin"] },
   {
     prefix: "/api/configuracoes/perfil",
     roles: ["admin"],

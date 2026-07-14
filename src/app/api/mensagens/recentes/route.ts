@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase";
+import { resolveDepartamentoRestricao } from "@/lib/departamentos-acesso";
 import type { Mensagem } from "@/types";
 
 interface MensagemRow {
@@ -19,10 +20,13 @@ interface MensagemRow {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const departamentoId = searchParams.get("departamento_id");
-  const perfil = request.headers.get("x-user-perfil");
-  const userId = request.headers.get("x-user-id");
 
   const supabase = supabaseAdmin();
+
+  const departamentoRestricao = await resolveDepartamentoRestricao(request, supabase);
+  if (departamentoRestricao && departamentoRestricao.length === 0) {
+    return NextResponse.json([]);
+  }
 
   let query = supabase
     .from("mensagens")
@@ -35,17 +39,8 @@ export async function GET(request: Request) {
     query = query.eq("leads.departamento_id", departamentoId);
   }
 
-  if (perfil && ["secretaria", "estagio"].includes(perfil) && userId) {
-    const { data: vinculos } = await supabase
-      .from("usuarios_departamentos")
-      .select("departamento_id")
-      .eq("usuario_id", userId);
-
-    const departamentoIds = (vinculos ?? []).map((v) => v.departamento_id);
-    if (departamentoIds.length === 0) {
-      return NextResponse.json([]);
-    }
-    query = query.in("leads.departamento_id", departamentoIds);
+  if (departamentoRestricao) {
+    query = query.in("leads.departamento_id", departamentoRestricao);
   }
 
   const { data, error } = await query.order("enviado_em", { ascending: false }).limit(20);

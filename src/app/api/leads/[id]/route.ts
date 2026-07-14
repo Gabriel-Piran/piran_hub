@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase";
+import { resolveDepartamentoRestricao } from "@/lib/departamentos-acesso";
 import { LEAD_ESTAGIOS } from "@/types";
 import type { LeadEstagio, LeadStatus } from "@/types";
 
@@ -28,7 +29,7 @@ const UPDATABLE_FIELDS = [
 ] as const;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -42,6 +43,14 @@ export async function GET(
 
   if (leadError || !lead) {
     return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
+  }
+
+  const departamentoRestricao = await resolveDepartamentoRestricao(request, supabase);
+  if (
+    departamentoRestricao &&
+    (!lead.departamento_id || !departamentoRestricao.includes(lead.departamento_id))
+  ) {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
   }
 
   const { data: mensagens, error: mensagensError } = await supabase
@@ -93,6 +102,7 @@ export async function PATCH(
   const validStatus: LeadStatus[] = [
     "ativo",
     "desqualificado",
+    "transferido",
     "contrato_enviado",
     "contrato_assinado",
     "arquivado",

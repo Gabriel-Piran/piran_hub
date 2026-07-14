@@ -19,6 +19,7 @@ export type Instancia = "ads" | "indicacoes";
 export type LeadStatus =
   | "ativo"
   | "desqualificado"
+  | "transferido"
   | "contrato_enviado"
   | "contrato_assinado"
   | "arquivado";

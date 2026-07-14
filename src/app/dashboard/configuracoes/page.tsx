@@ -16,13 +16,13 @@ import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
+import { IntegracaoStatusRow } from "@/components/dashboard/IntegracaoStatus";
 
 interface PerfilConfig {
   nome: string;
@@ -35,24 +35,11 @@ interface PerfilConfig {
   };
 }
 
-interface WhatsappStatus {
-  connected?: boolean;
-  error?: string;
-}
-
 function ConfiguracoesView() {
   const { data: config, mutate } = useSWR(
     "/api/configuracoes/perfil",
     (endpoint: string) => apiFetch<PerfilConfig>(endpoint),
     { onError: (err) => console.error("SWR error:", err) }
-  );
-  const { data: adsStatus } = useSWR(
-    "/api/configuracoes/whatsapp-status",
-    (endpoint: string) => apiFetch<WhatsappStatus>(endpoint),
-    {
-      refreshInterval: 30_000,
-      onError: (err) => console.error("SWR error:", err),
-    }
   );
 
   const nomeRef = useRef<HTMLInputElement>(null);
@@ -110,8 +97,6 @@ function ConfiguracoesView() {
       toast.error("Não foi possível atualizar a notificação.");
     }
   };
-
-  const isAdsConectado = adsStatus?.connected ?? false;
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
@@ -233,9 +218,7 @@ function ConfiguracoesView() {
                 <p className="text-xs text-white/40">Leads via anúncios pagos</p>
               </div>
             </div>
-            <Badge variant={isAdsConectado ? "ads" : "muted"}>
-              {isAdsConectado ? "conectado" : "desconectado"}
-            </Badge>
+            <IntegracaoStatusRow instancia="ads" label="Instância Ads" />
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3">
@@ -248,9 +231,7 @@ function ConfiguracoesView() {
                 </p>
               </div>
             </div>
-            <Badge variant={isAdsConectado ? "indicacoes" : "muted"}>
-              {isAdsConectado ? "conectado" : "desconectado"}
-            </Badge>
+            <IntegracaoStatusRow instancia="indicacoes" label="Instância Indicações" />
           </div>
         </CardContent>
       </Card>

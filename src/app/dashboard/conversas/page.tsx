@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download } from "lucide-react";
@@ -15,12 +16,20 @@ import {
   useEstagios,
 } from "@/hooks/useDashboard";
 import { useSession } from "@/hooks/useSession";
-import type { Mensagem, MensagemRapida, ModoAtendimento } from "@/types";
+import { useLeadsFiltros } from "@/hooks/useLeadsFiltros";
+import type {
+  EstagioCustomizado,
+  LeadComMensagens,
+  Mensagem,
+  MensagemRapida,
+  ModoAtendimento,
+} from "@/types";
 import { MODO_ATENDIMENTO_LABELS } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
+import { FiltrosButton, FiltrosPanel } from "@/components/dashboard/FiltrosPanel";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 
@@ -277,8 +286,8 @@ function StageDropdown({
   estagiosMap,
   onUpdate,
 }: {
-  lead: any;
-  estagios: any[];
+  lead: LeadComMensagens;
+  estagios: EstagioCustomizado[];
   estagiosMap: Map<string, { nome: string; cor: string }>;
   onUpdate: () => void;
 }) {
@@ -361,6 +370,83 @@ function StageDropdown({
   );
 }
 
+function DepartamentoDropdown({
+  lead,
+  departamentos,
+  onUpdate,
+}: {
+  lead: LeadComMensagens;
+  departamentos: { id: string; nome: string; cor: string }[];
+  onUpdate: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const atual = departamentos.find((d) => d.id === lead.departamento_id);
+
+  const handleSelect = async (departamentoId: string, nome: string) => {
+    setIsOpen(false);
+    if (departamentoId === lead.departamento_id) return;
+
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ departamento_id: departamentoId }),
+      });
+      if (!res.ok) throw new Error();
+
+      toast.success(`Lead transferido para ${nome}`);
+      onUpdate();
+    } catch {
+      toast.error("Erro ao transferir o lead.");
+    }
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 rounded border border-white/10 px-2 py-1 text-xs font-medium text-white/80 transition-colors hover:bg-white/5 focus:outline-none"
+      >
+        {atual && (
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: atual.cor }} />
+        )}
+        <span>{atual?.nome ?? "Sem departamento"}</span>
+        <span className="text-[10px] opacity-70">▼</span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 mt-1 z-50 w-52 rounded-md border border-white/10 bg-[#1a1a1a] shadow-xl py-1">
+          {departamentos.map((dep) => (
+            <button
+              key={dep.id}
+              onClick={() => handleSelect(dep.id, dep.nome)}
+              className={cn(
+                "flex w-full items-center justify-between px-3 py-2 text-left text-xs text-white hover:bg-white/5",
+                lead.departamento_id === dep.id && "bg-white/10 font-semibold"
+              )}
+            >
+              <span>{dep.nome}</span>
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: dep.cor }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuickMessagesPopover({
   mensagens,
   filtro,
@@ -404,11 +490,16 @@ function QuickMessagesPopover({
 function ConversationsView() {
   const [activeTab, setActiveTab] = useState<"ia" | "pendente" | "humano" | "arquivado">("ia");
   const [departamentoFiltro, setDepartamentoFiltro] = useState<string>("TODOS");
+  const [filtrosOpen, setFiltrosOpen] = useState(false);
+  const { filtros, aplicarFiltros, limparFiltros, totalAtivos } = useLeadsFiltros("conversas");
   const { departamentos } = useDepartamentos();
   const { estagios } = useEstagios();
   const { user } = useSession();
   const podeEnviar = user?.perfil !== "estagio";
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const leadParam = searchParams.get("lead");
+  const appliedLeadParamRef = useRef(false);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [notaMode, setNotaMode] = useState(false);
@@ -426,10 +517,24 @@ function ConversationsView() {
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<any>(null);
 
-  const iaQuery = `/api/leads?modo_atendimento=ia&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
-  const pendenteQuery = `/api/leads?modo_atendimento=pendente&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
-  const humanoQuery = `/api/leads?modo_atendimento=humano&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
-  const arquivadoQuery = `/api/leads?status=arquivado${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}`;
+  const filtrosExtras = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filtros.estagio.length) params.set("estagio", filtros.estagio.join(","));
+    if (filtros.instancia.length) params.set("instancia", filtros.instancia.join(","));
+    if (filtros.criado_de) params.set("criado_de", filtros.criado_de);
+    if (filtros.criado_ate) params.set("criado_ate", filtros.criado_ate);
+    if (filtros.contato_de) params.set("contato_de", filtros.contato_de);
+    if (filtros.contato_ate) params.set("contato_ate", filtros.contato_ate);
+    if (filtros.tem_contrato) params.set("tem_contrato", filtros.tem_contrato);
+    if (filtros.busca) params.set("busca", filtros.busca);
+    return params.toString();
+  }, [filtros]);
+  const extraQs = filtrosExtras ? `&${filtrosExtras}` : "";
+
+  const iaQuery = `/api/leads?modo_atendimento=ia&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  const pendenteQuery = `/api/leads?modo_atendimento=pendente&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  const humanoQuery = `/api/leads?modo_atendimento=humano&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  const arquivadoQuery = `/api/leads?status=arquivado${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
 
   const { data: iaLeadsRaw, mutate: mutateIA } = useSWR<any[]>(iaQuery, apiFetch);
   const { data: pendenteLeadsRaw, mutate: mutatePendente } = useSWR<any[]>(pendenteQuery, apiFetch);
@@ -470,15 +575,23 @@ function ConversationsView() {
     arquivado: arquivadoLeadsRaw === undefined,
   }[activeTab];
 
+  // Abre direto o lead vindo de ?lead=ID (ex: botão "abrir conversa" na lista de leads)
+  useEffect(() => {
+    if (!leadParam || appliedLeadParamRef.current) return;
+    appliedLeadParamRef.current = true;
+    setSelectedLeadId(leadParam);
+  }, [leadParam]);
+
   // Seleciona automaticamente o primeiro lead da aba atual quando ela muda ou quando a lista carrega
   useEffect(() => {
+    if (leadParam && selectedLeadId === leadParam) return;
     const leadExistsInTab = currentLeads.some((l) => l.id === selectedLeadId);
     if (!leadExistsInTab && currentLeads.length > 0) {
       setSelectedLeadId(currentLeads[0].id);
     } else if (currentLeads.length === 0) {
       setSelectedLeadId(null);
     }
-  }, [activeTab, currentLeads, selectedLeadId]);
+  }, [activeTab, currentLeads, selectedLeadId, leadParam]);
 
   const activeLeadId = selectedLeadId ?? currentLeads[0]?.id ?? null;
 
@@ -930,18 +1043,30 @@ function ConversationsView() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
-      <select
-        value={departamentoFiltro}
-        onChange={(e) => setDepartamentoFiltro(e.target.value)}
-        className="w-fit rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
-      >
-        <option value="TODOS">Todos os departamentos</option>
-        {departamentos.map((dep) => (
-          <option key={dep.id} value={dep.id}>
-            {dep.nome}
-          </option>
-        ))}
-      </select>
+      <div className="flex items-center gap-2">
+        <select
+          value={departamentoFiltro}
+          onChange={(e) => setDepartamentoFiltro(e.target.value)}
+          className="w-fit rounded-md border border-white/10 bg-[#1a1a1a] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+        >
+          <option value="TODOS">Todos os departamentos</option>
+          {departamentos.map((dep) => (
+            <option key={dep.id} value={dep.id}>
+              {dep.nome}
+            </option>
+          ))}
+        </select>
+
+        <FiltrosButton totalAtivos={totalAtivos} onClick={() => setFiltrosOpen(true)} />
+      </div>
+
+      <FiltrosPanel
+        open={filtrosOpen}
+        onOpenChange={setFiltrosOpen}
+        filtros={filtros}
+        onAplicar={aplicarFiltros}
+        onLimpar={limparFiltros}
+      />
 
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Sidebar */}
@@ -1129,6 +1254,16 @@ function ConversationsView() {
                     <Badge variant={lead.instancia === "ads" ? "ads" : "indicacoes"} className="text-[10px] px-2 py-0.5 uppercase">
                       {lead.instancia === "ads" ? "ADS" : "INDICAÇÕES"}
                     </Badge>
+
+                    {/* Departamento (transferir) */}
+                    <DepartamentoDropdown
+                      lead={lead}
+                      departamentos={departamentos}
+                      onUpdate={() => {
+                        mutateAllLists();
+                        mutate();
+                      }}
+                    />
                   </div>
 
                   {/* Header Actions: Archive / Reactivate */}
@@ -1410,7 +1545,9 @@ export default function ConversasPage() {
   return (
     <div className="p-6">
       <ErrorBoundary label="as conversas">
-        <ConversationsView />
+        <Suspense fallback={<Skeleton className="h-12 w-full" />}>
+          <ConversationsView />
+        </Suspense>
       </ErrorBoundary>
     </div>
   );
