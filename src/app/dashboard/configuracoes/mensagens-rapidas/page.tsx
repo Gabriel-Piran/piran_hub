@@ -208,14 +208,17 @@ function MensagensRapidasView() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-
-  const isEditing = Boolean(form.id);
+  const [isEditing, setIsEditing] = useState(false);
 
   const openCreate = () => {
     setForm({
       ...EMPTY_FORM,
+      // Pré-gera o id para permitir upload de mídia antes de o registro
+      // existir no banco — não confundir com "está editando" (o registro
+      // ainda não foi inserido; handleSave deve chamar POST, não PATCH).
       id: crypto.randomUUID(),
     });
+    setIsEditing(false);
     setModalOpen(true);
   };
 
@@ -229,6 +232,7 @@ function MensagensRapidasView() {
       atalho: msg.atalho ?? "",
       departamento_id: msg.departamento_id ?? "",
     });
+    setIsEditing(true);
     setModalOpen(true);
   };
 
