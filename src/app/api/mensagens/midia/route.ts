@@ -1,21 +1,53 @@
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig } from "@/lib/zapi";
 
 /**
- * Z-API converte o áudio no servidor deles com base na extensão informada;
- * se ela não bater com o formato real dos bytes gravados (webm/opus quando
- * o navegador não suporta o mimeType "audio/ogg" no MediaRecorder), a
- * conversão falha (ConvertMediaException). Por isso a extensão precisa ser
- * derivada do mime type real, nunca fixa em "ogg".
+ * O navegador só consegue gravar em WebM/Opus (MediaRecorder não suporta
+ * gerar Ogg nativamente na maioria dos browsers), mas a nota de voz do
+ * WhatsApp exige o container Ogg com codec Opus. Sem essa conversão, a
+ * Z-API recebe o WebM cru e falha ao converter (ConvertMediaException).
+ * Requer o binário `ffmpeg` instalado na imagem (ver Dockerfile).
  */
-function audioExtensionFromMime(mimeType: string): string {
-  const base = mimeType.split(";")[0].trim().toLowerCase();
-  if (base === "audio/webm") return "webm";
-  if (base === "audio/mp4" || base === "audio/aac") return "mp4";
-  if (base === "audio/mpeg") return "mp3";
-  if (base === "audio/wav" || base === "audio/x-wav") return "wav";
-  return "ogg";
+async function transcodeToOggOpus(input: Buffer): Promise<Buffer> {
+  const dir = await mkdtemp(join(tmpdir(), "audio-"));
+  const inputPath = join(dir, "input");
+  const outputPath = join(dir, "output.ogg");
+
+  try {
+    await writeFile(inputPath, input);
+
+    await new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", [
+        "-y",
+        "-i", inputPath,
+        "-c:a", "libopus",
+        "-b:a", "32k",
+        "-ac", "1",
+        "-ar", "16000",
+        outputPath,
+      ]);
+
+      let stderr = "";
+      ffmpeg.stderr.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+      ffmpeg.on("error", reject);
+      ffmpeg.on("close", (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`ffmpeg falhou (código ${code}): ${stderr.slice(-500)}`));
+      });
+    });
+
+    return await readFile(outputPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 export async function POST(request: Request) {
@@ -55,11 +87,20 @@ export async function POST(request: Request) {
 
       // Decodifica base64
       const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
-      fileBuffer = Buffer.from(cleanBase64, "base64");
+      const rawBuffer = Buffer.from(cleanBase64, "base64");
+
+      try {
+        fileBuffer = await transcodeToOggOpus(rawBuffer);
+      } catch (err) {
+        return NextResponse.json(
+          { error: `Falha ao converter o áudio gravado: ${(err as Error).message}` },
+          { status: 500 }
+        );
+      }
+      fileMimeType = "audio/ogg";
 
       const timestamp = Date.now();
-      const audioExtension = audioExtensionFromMime(fileMimeType);
-      fileName = `${timestamp}.${audioExtension}`;
+      fileName = `${timestamp}.ogg`;
       path = `audios/${leadId}/${fileName}`;
 
     } else if (contentType.includes("multipart/form-data")) {
@@ -124,7 +165,7 @@ export async function POST(request: Request) {
       zapiBody = {
         phone: lead.numero_whatsapp,
         audio: url_publica,
-        extension: audioExtensionFromMime(fileMimeType),
+        extension: "ogg",
       };
     } else if (tipo === "imagem") {
       zapiPath = "send-image";
