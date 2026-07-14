@@ -27,6 +27,13 @@ import type {
 import { MODO_ATENDIMENTO_LABELS } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
 import { FiltrosButton, FiltrosPanel } from "@/components/dashboard/FiltrosPanel";
@@ -507,6 +514,9 @@ function ConversationsView() {
   const [scheduleValue, setScheduleValue] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -939,8 +949,35 @@ function ConversationsView() {
     }
   };
 
+  const handleResetConversa = async () => {
+    if (!activeLeadId) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/leads/${activeLeadId}/reset`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        toast.error(body?.error ?? "Não foi possível resetar a conversa.");
+        return;
+      }
+      setDraft("");
+      setResetConfirmOpen(false);
+      await mutate();
+      mutateAllLists();
+      toast.success("Conversa resetada.");
+    } catch {
+      toast.error("Erro de conexão ao resetar a conversa.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!activeLeadId) return;
+
+    if (draft.trim().toLowerCase() === "/reset") {
+      setResetConfirmOpen(true);
+      return;
+    }
 
     if (selectedFile) {
       setSending(true);
@@ -1539,6 +1576,31 @@ function ConversationsView() {
           />
         </div>
       )}
+
+      <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resetar conversa?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-white/60">
+            {(lead?.mensagens?.length ?? 0)} mensagens serão apagadas permanentemente e a
+            conversa voltará ao estágio inicial com o atendimento pela IA. Essa ação não pode
+            ser desfeita.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setResetConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={resetting}
+              className="bg-red-500 text-white hover:bg-red-600"
+              onClick={handleResetConversa}
+            >
+              {resetting ? "Resetando..." : "Resetar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
