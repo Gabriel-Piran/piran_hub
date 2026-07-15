@@ -113,7 +113,11 @@ function matchRule(rules: RouteRule[], pathname: string, method: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api/auth") || pathname === "/api/health") {
+  if (
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/internal/")
+  ) {
     return NextResponse.next();
   }
 
