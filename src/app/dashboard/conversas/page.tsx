@@ -643,10 +643,10 @@ function ConversationsView() {
   const humanoQuery = `/api/leads?modo_atendimento=humano&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
   const arquivadoQuery = `/api/leads?status=arquivado${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
 
-  const { data: iaLeadsRaw, mutate: mutateIA } = useSWR<any[]>(iaQuery, apiFetch);
-  const { data: pendenteLeadsRaw, mutate: mutatePendente } = useSWR<any[]>(pendenteQuery, apiFetch);
-  const { data: humanoLeadsRaw, mutate: mutateHumano } = useSWR<any[]>(humanoQuery, apiFetch);
-  const { data: arquivadoLeadsRaw, mutate: mutateArquivado } = useSWR<any[]>(arquivadoQuery, apiFetch);
+  const { data: iaLeadsRaw, mutate: mutateIA } = useSWR<any[]>(iaQuery, apiFetch, { refreshInterval: 5000 });
+  const { data: pendenteLeadsRaw, mutate: mutatePendente } = useSWR<any[]>(pendenteQuery, apiFetch, { refreshInterval: 5000 });
+  const { data: humanoLeadsRaw, mutate: mutateHumano } = useSWR<any[]>(humanoQuery, apiFetch, { refreshInterval: 5000 });
+  const { data: arquivadoLeadsRaw, mutate: mutateArquivado } = useSWR<any[]>(arquivadoQuery, apiFetch, { refreshInterval: 5000 });
 
   const iaLeads = iaLeadsRaw ?? [];
   const pendenteLeads = pendenteLeadsRaw ?? [];
