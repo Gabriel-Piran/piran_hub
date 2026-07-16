@@ -179,7 +179,7 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
   return queuedItems.length;
 }
 
-function shuffle<T>(array: T[]): T[] {
+export function shuffle<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -188,13 +188,13 @@ function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
-function isEligibleDay(date: Date, diasSemana: string[]): boolean {
+export function isEligibleDay(date: Date, diasSemana: string[]): boolean {
   const dayNum = date.getDay();
   const dayStr = dayNum === 0 ? "7" : String(dayNum);
   return diasSemana.includes(dayStr) || diasSemana.includes(String(dayNum));
 }
 
-function getNextEligibleDay(date: Date, diasSemana: string[]): Date {
+export function getNextEligibleDay(date: Date, diasSemana: string[]): Date {
   const next = new Date(date);
   while (true) {
     next.setDate(next.getDate() + 1);

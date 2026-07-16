@@ -1,57 +1,97 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { zapiConfig } from "@/lib/zapi";
+import { zapiConfig, type ZapiInstancia } from "@/lib/zapi";
+import { shuffle, isEligibleDay, getNextEligibleDay } from "@/lib/followup-scheduler";
 
-export async function GET(request: Request) {
-  // Check CRON_SECRET if configured
+function autorizado(request: Request): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const clientSecret = request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret");
-    if (clientSecret !== cronSecret) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  if (!cronSecret) return true;
+  const clientSecret =
+    request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret");
+  return clientSecret === cronSecret;
+}
+
+async function calcularProximoAgendamento(
+  regra: {
+    dias_espera: number;
+    horario_inicio: string | null;
+    horario_fim: string | null;
+    intervalo_minutos_min: number | null;
+    dias_semana: string[] | null;
+  }
+): Promise<string> {
+  const horarioInicio = regra.horario_inicio || "08:00";
+  const horarioFim = regra.horario_fim || "18:00";
+  const intervalMin = regra.intervalo_minutos_min || 1;
+  const diasSemana = regra.dias_semana || ["1", "2", "3", "4", "5"];
+
+  const [startHour, startMin] = horarioInicio.split(":").map(Number);
+  const [endHour, endMin] = horarioFim.split(":").map(Number);
+  const totalWindowMinutes = endHour * 60 + endMin - (startHour * 60 + startMin);
+  const slotsPerDay = Math.max(1, Math.floor(totalWindowMinutes / intervalMin));
+
+  let currentDate = new Date();
+  currentDate.setDate(currentDate.getDate() + Math.max(1, regra.dias_espera));
+
+  while (true) {
+    if (!isEligibleDay(currentDate, diasSemana)) {
+      currentDate = getNextEligibleDay(currentDate, diasSemana);
+      continue;
     }
-  }
 
+    const slots: Date[] = [];
+    for (let i = 0; i < slotsPerDay; i++) {
+      const slotDate = new Date(currentDate);
+      slotDate.setHours(startHour, startMin, 0, 0);
+      slotDate.setMinutes(slotDate.getMinutes() + i * intervalMin);
+      if (slotDate.getTime() > Date.now()) {
+        slots.push(slotDate);
+      }
+    }
+
+    if (slots.length === 0) {
+      currentDate = getNextEligibleDay(currentDate, diasSemana);
+      continue;
+    }
+
+    const [proximoSlot] = shuffle(slots);
+    return proximoSlot.toISOString();
+  }
+}
+
+async function processarFila() {
   const supabase = supabaseAdmin();
-  const zapi = zapiConfig();
 
-  if (!zapi) {
-    return NextResponse.json({ error: "Z-API não configurada" }, { status: 500 });
-  }
-
-  // Fetch pending items
   const { data: items, error: itemsError } = await supabase
     .from("followup_fila")
-    .select("*, leads(numero_whatsapp)")
+    .select("*, leads(numero_whatsapp, instancia)")
     .eq("status", "pendente")
     .lte("agendado_para", new Date().toISOString())
     .lt("tentativas", 3)
-    .limit(10);
+    .limit(5);
 
   if (itemsError) {
-    return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    throw new Error(itemsError.message);
   }
 
-  // Debug: quantos itens estão na fila no total vs. quantos foram pegos
-  // agora, para diagnosticar por que o follow-up "não dispara" — a causa
-  // mais comum é agendado_para no futuro ou tentativas já esgotadas.
-  const { count: totalNaFila } = await supabase
-    .from("followup_fila")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pendente");
-
-  const enviados: any[] = [];
+  let enviadas = 0;
+  let erros = 0;
+  let proximas_agendadas = 0;
 
   for (const item of items ?? []) {
     const leadInfo = Array.isArray(item.leads) ? item.leads[0] : item.leads;
     const phone = leadInfo?.numero_whatsapp;
+    const instancia = leadInfo?.instancia as ZapiInstancia | undefined;
 
-    if (!phone) {
+    const zapi = zapiConfig(instancia);
+
+    if (!phone || !zapi) {
+      erros += 1;
       await supabase
         .from("followup_fila")
         .update({
           status: "erro",
-          erro_mensagem: "Lead sem número de WhatsApp",
+          erro_mensagem: !phone ? "Lead sem número de WhatsApp" : "Z-API não configurada para a instância",
           tentativas: item.tentativas + 1,
         })
         .eq("id", item.id);
@@ -59,7 +99,7 @@ export async function GET(request: Request) {
     }
 
     let zapiPath = "send-text";
-    let zapiBody: any = { phone };
+    const zapiBody: Record<string, unknown> = { phone };
 
     if (item.tipo === "audio" && item.midia_url) {
       zapiPath = "send-audio";
@@ -89,50 +129,7 @@ export async function GET(request: Request) {
         body: JSON.stringify(zapiBody),
       });
 
-      if (zapiRes.ok) {
-        const now = new Date().toISOString();
-
-        // 1. Update queue item to 'enviado'
-        await supabase
-          .from("followup_fila")
-          .update({
-            status: "enviado",
-            enviado_em: now,
-            tentativas: item.tentativas + 1,
-          })
-          .eq("id", item.id);
-
-        // 2. Mark as sent in followups_enviados (idempotency)
-        await supabase
-          .from("followups_enviados")
-          .upsert({
-            lead_id: item.lead_id,
-            regra_id: item.regra_id,
-            enviado_em: now,
-          }, {
-            onConflict: "lead_id,regra_id"
-          });
-
-        // 3. Save message log in messages table
-        let conteudo = item.mensagem_texto || "";
-        if (item.tipo === "audio") conteudo = "[Áudio]";
-        else if (item.tipo !== "texto" && item.midia_url) {
-          conteudo = item.midia_url.split("/").pop() || "Arquivo";
-        }
-
-        await supabase
-          .from("mensagens")
-          .insert({
-            lead_id: item.lead_id,
-            conteudo,
-            role: "sistema",
-            tipo: item.tipo === "documento" ? "documento" : (item.tipo === "imagem" ? "imagem" : (item.tipo === "audio" ? "audio" : "texto")),
-            midia_url: item.midia_url || null,
-            enviado_em: now,
-          });
-
-        enviados.push({ id: item.id, lead_id: item.lead_id, status: "enviado" });
-      } else {
+      if (!zapiRes.ok) {
         const errText = await zapiRes.text().catch(() => "");
         const novasTentativas = item.tentativas + 1;
         const novoStatus = novasTentativas >= 3 ? "erro" : "pendente";
@@ -142,11 +139,71 @@ export async function GET(request: Request) {
           .update({
             status: novoStatus,
             tentativas: novasTentativas,
-            erro_mensagem: `Z-API returned ${zapiRes.status}: ${errText}`,
+            erro_mensagem: `Z-API retornou ${zapiRes.status}: ${errText}`,
           })
           .eq("id", item.id);
+
+        erros += 1;
+        continue;
       }
-    } catch (err: any) {
+
+      const now = new Date().toISOString();
+
+      await supabase
+        .from("followup_fila")
+        .update({
+          status: "enviado",
+          enviado_em: now,
+          tentativas: item.tentativas + 1,
+        })
+        .eq("id", item.id);
+
+      await supabase
+        .from("followups_enviados")
+        .upsert(
+          { lead_id: item.lead_id, regra_id: item.regra_id, enviado_em: now },
+          { onConflict: "lead_id,regra_id" }
+        );
+
+      await supabase.from("mensagens").insert({
+        lead_id: item.lead_id,
+        conteudo: item.mensagem_texto || "",
+        role: "assistente",
+        tipo: "texto",
+        enviado_em: now,
+        acao_executada: "FUP_ENVIADO",
+      });
+
+      enviadas += 1;
+
+      if (item.regra_id) {
+        const { data: regra } = await supabase
+          .from("followup_regras")
+          .select("dias_espera, horario_inicio, horario_fim, intervalo_minutos_min, dias_semana, max_sequencias")
+          .eq("id", item.regra_id)
+          .maybeSingle();
+
+        if (regra && item.sequencia_atual < regra.max_sequencias) {
+          const proximoAgendadoPara = await calcularProximoAgendamento(regra);
+
+          const { error: insertError } = await supabase.from("followup_fila").insert({
+            lead_id: item.lead_id,
+            regra_id: item.regra_id,
+            mensagem_texto: item.mensagem_texto,
+            midia_url: item.midia_url,
+            tipo: item.tipo,
+            agendado_para: proximoAgendadoPara,
+            status: "pendente",
+            tentativas: 0,
+            sequencia_atual: item.sequencia_atual + 1,
+          });
+
+          if (!insertError) {
+            proximas_agendadas += 1;
+          }
+        }
+      }
+    } catch (err) {
       const novasTentativas = item.tentativas + 1;
       const novoStatus = novasTentativas >= 3 ? "erro" : "pendente";
 
@@ -155,18 +212,31 @@ export async function GET(request: Request) {
         .update({
           status: novoStatus,
           tentativas: novasTentativas,
-          erro_mensagem: err.message || "Erro de conexão",
+          erro_mensagem: (err as Error).message || "Erro de conexão",
         })
         .eq("id", item.id);
+
+      erros += 1;
     }
   }
 
-  return NextResponse.json({
-    enviados,
-    debug: {
-      pendentes_no_total: totalNaFila ?? 0,
-      pegos_nesta_execucao: (items ?? []).length,
-      ids_pegos: (items ?? []).map((i) => i.id),
-    },
-  });
+  return { enviadas, erros, proximas_agendadas };
+}
+
+export async function GET(request: Request) {
+  if (!autorizado(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const resultado = await processarFila();
+  return NextResponse.json(resultado);
+}
+
+export async function POST(request: Request) {
+  if (!autorizado(request)) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
+  const resultado = await processarFila();
+  return NextResponse.json(resultado);
 }
