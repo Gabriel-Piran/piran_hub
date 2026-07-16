@@ -10,6 +10,7 @@ import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
 
 import {
+  useAcoes,
   useDepartamentos,
   useLead,
   useMensagensRapidas,
@@ -18,6 +19,7 @@ import {
 import { useSession } from "@/hooks/useSession";
 import { useLeadsFiltros } from "@/hooks/useLeadsFiltros";
 import type {
+  Acao,
   EstagioCustomizado,
   LeadComMensagens,
   Mensagem,
@@ -560,6 +562,44 @@ function DepartamentoDropdown({
   );
 }
 
+function AcoesPopover({
+  acoes,
+  filtro,
+  onSelect,
+}: {
+  acoes: Acao[];
+  filtro: string;
+  onSelect: (acao: Acao) => void;
+}) {
+  const filtradas = (Array.isArray(acoes) ? acoes : []).filter(
+    (a) =>
+      a.ativo &&
+      (filtro === "" ||
+        a.slug.toLowerCase().includes(filtro.toLowerCase()) ||
+        a.nome.toLowerCase().includes(filtro.toLowerCase()))
+  );
+
+  if (filtradas.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-full left-0 mb-2 w-full max-w-sm overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl z-50">
+      {filtradas.map((acao) => (
+        <button
+          key={acao.id}
+          onClick={() => onSelect(acao)}
+          className="flex w-full flex-col items-start gap-0.5 border-b border-white/5 px-3 py-2 text-left last:border-0 hover:bg-white/5"
+        >
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="text-sm font-medium text-[#c9a84c]">@{acao.slug}</span>
+            <Badge variant="muted">{acao.tipo}</Badge>
+          </div>
+          <span className="text-xs text-white/50">{acao.nome}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function QuickMessagesPopover({
   mensagens,
   filtro,
@@ -726,6 +766,8 @@ function ConversationsView() {
 
   const { lead, isLoading: isLoadingLead, mutate } = useLead(activeLeadId);
   const { mensagensRapidas } = useMensagensRapidas(lead?.departamento_id);
+  const { acoes } = useAcoes();
+  const [executandoAcao, setExecutandoAcao] = useState(false);
 
   const estagiosMap = useMemo(() => {
     const map = new Map<string, { nome: string; cor: string }>();
@@ -956,6 +998,7 @@ function ConversationsView() {
   }, [activeLeadId]);
 
   const quickFiltro = draft.startsWith("/") ? draft.slice(1) : null;
+  const acaoFiltro = draft.startsWith("@") ? draft.slice(1) : null;
 
   const formatRelativeTime = (isoString?: string | null) => {
     if (!isoString) return "";
@@ -1034,6 +1077,32 @@ function ConversationsView() {
       toast.error("Erro de conexão ao enviar mensagem.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSelectAcao = async (acao: Acao) => {
+    if (!activeLeadId) return;
+
+    setDraft("");
+    setExecutandoAcao(true);
+    try {
+      const res = await fetch("/api/acoes/executar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao_id: acao.id, lead_id: activeLeadId }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(body?.error ?? `Não foi possível executar @${acao.slug}.`);
+        return;
+      }
+      toast.success(`Ação "${acao.nome}" executada.`);
+      await mutate();
+      mutateAllLists();
+    } catch {
+      toast.error("Erro de conexão ao executar a ação.");
+    } finally {
+      setExecutandoAcao(false);
     }
   };
 
@@ -1680,6 +1749,14 @@ function ConversationsView() {
                       />
                     )}
 
+                    {acaoFiltro !== null && (
+                      <AcoesPopover
+                        acoes={acoes}
+                        filtro={acaoFiltro}
+                        onSelect={handleSelectAcao}
+                      />
+                    )}
+
                     {/* Hidden File Input */}
                     <input
                       type="file"
@@ -1769,7 +1846,7 @@ function ConversationsView() {
 
                     <button
                       onClick={handleSend}
-                      disabled={sending || (!draft.trim() && !selectedFile)}
+                      disabled={sending || executandoAcao || (!draft.trim() && !selectedFile)}
                       className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-[#c9a84c] text-[#0f0f0f] transition-colors hover:bg-[#d9bb63] disabled:cursor-not-allowed disabled:opacity-50"
                       aria-label="Enviar"
                     >

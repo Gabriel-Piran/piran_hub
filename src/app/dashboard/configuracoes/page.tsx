@@ -9,8 +9,10 @@ import {
   Megaphone,
   MessageSquareText,
   Share2,
+  SlidersHorizontal,
   Users,
   Workflow,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -324,6 +326,36 @@ function ConfiguracoesView() {
                 <p className="text-sm text-white">Follow-ups automáticos</p>
                 <p className="text-xs text-white/40">
                   Regras de reengajamento automático por estágio
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/acoes"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <Zap className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Ações / Tools (@)</p>
+                <p className="text-xs text-white/40">
+                  Comandos rápidos disparados via @ na conversa
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/regras"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <SlidersHorizontal className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Regras condicionais</p>
+                <p className="text-xs text-white/40">
+                  Executa ações automaticamente por palavra-chave na conversa
                 </p>
               </div>
             </div>

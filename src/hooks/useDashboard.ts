@@ -9,6 +9,7 @@ import {
 } from "@/lib/mock-data";
 import { LEAD_ESTAGIOS } from "@/types";
 import type {
+  Acao,
   ChartPoint,
   Departamento,
   EstagioCustomizado,
@@ -158,6 +159,16 @@ export function useMensagensRapidas(departamentoId?: string | null) {
   );
 
   return { mensagensRapidas: Array.isArray(data) ? data : [], isLoading, mutate };
+}
+
+export function useAcoes() {
+  const { data, isLoading, mutate } = useSWR(
+    "/api/acoes",
+    (endpoint: string) => apiFetch<Acao[]>(endpoint),
+    { onError: (err) => console.error("SWR error:", err) }
+  );
+
+  return { acoes: Array.isArray(data) ? data : [], isLoading, mutate };
 }
 
 export function useLeadsChart(days = 7) {

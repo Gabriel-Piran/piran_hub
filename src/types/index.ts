@@ -133,6 +133,47 @@ export interface LeadComMensagens extends Lead {
   mensagens: Mensagem[];
 }
 
+export type AcaoTipo =
+  | "estagio"
+  | "status"
+  | "mensagem"
+  | "webhook"
+  | "transferir"
+  | "arquivar"
+  | "contrato";
+
+export const ACAO_TIPO_LABELS: Record<AcaoTipo, string> = {
+  estagio: "Mudar estágio",
+  status: "Mudar status",
+  mensagem: "Enviar mensagem",
+  webhook: "Webhook",
+  transferir: "Transferir para humano",
+  arquivar: "Arquivar",
+  contrato: "Gerar contrato",
+};
+
+export interface Acao {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao: string | null;
+  tipo: AcaoTipo;
+  configuracao: Record<string, unknown>;
+  ativo: boolean;
+  criado_em: string;
+}
+
+export interface RegraCondicional {
+  id: string;
+  nome: string;
+  estagio_gatilho: string | null;
+  palavras_chave: string[];
+  acao_id: string | null;
+  prioridade: number;
+  ativo: boolean;
+  criado_em: string;
+}
+
 export interface MetricasCard {
   id: string;
   titulo: string;
