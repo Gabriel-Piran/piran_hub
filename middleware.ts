@@ -117,7 +117,8 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
-    pathname.startsWith("/api/internal/")
+    pathname.startsWith("/api/internal/") ||
+    pathname === "/api/regras-condicionais/verificar"
   ) {
     return NextResponse.next();
   }

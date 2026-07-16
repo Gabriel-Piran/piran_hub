@@ -3,6 +3,13 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function GET(request: Request) {
+  const secret = process.env.INTERNAL_API_SECRET;
+  const headerSecret = request.headers.get("x-internal-secret");
+
+  if (!secret || headerSecret !== secret) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const mensagem = (searchParams.get("mensagem") ?? "").toLowerCase();
   const estagio = searchParams.get("estagio") ?? "";
