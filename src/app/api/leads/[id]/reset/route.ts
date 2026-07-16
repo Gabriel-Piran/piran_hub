@@ -16,5 +16,5 @@ export async function POST(
     return NextResponse.json({ error: resultado.error }, { status: resultado.status });
   }
 
-  return NextResponse.json({ ok: true, lead: resultado.lead });
+  return NextResponse.json({ success: true, lead_id: id });
 }
