@@ -96,6 +96,7 @@ const API_RULES: RouteRule[] = [
 const CRON_SECRET_ROUTES = [
   "/api/followup-processar",
   "/api/mensagens/agendadas",
+  "/api/mensagens/agendadas/processar",
   "/api/followup/processar",
   "/api/followup/verificar-regras",
 ];
@@ -122,7 +123,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (
-    request.method === "GET" &&
+    (request.method === "GET" || request.method === "POST") &&
     CRON_SECRET_ROUTES.includes(pathname) &&
     process.env.CRON_SECRET &&
     request.headers.get("x-cron-secret") === process.env.CRON_SECRET
