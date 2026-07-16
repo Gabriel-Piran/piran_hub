@@ -1,10 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download, Pencil } from "lucide-react";
+import { Archive, Bot, Clock, RotateCcw, Send, StickyNote, User, X, Mic, Paperclip, FileText, Download, Pencil, PencilLine } from "lucide-react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "framer-motion";
@@ -93,6 +93,20 @@ function formatAgendadoAmigavel(iso: string): string {
   if (mesmoDia(date, hoje)) return `hoje às ${hora}:${min}`;
   if (mesmoDia(date, amanha)) return `amanhã às ${hora}:${min}`;
   return formatAgendado(iso);
+}
+
+function formatTelefoneBR(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 13);
+  const pais = digits.slice(0, 2);
+  const ddd = digits.slice(2, 4);
+  const parte1 = digits.slice(4, 9);
+  const parte2 = digits.slice(9, 13);
+
+  let out = pais;
+  if (ddd) out += ` ${ddd}`;
+  if (parte1) out += ` ${parte1}`;
+  if (parte2) out += `-${parte2}`;
+  return out;
 }
 
 function toDatetimeLocalValue(iso: string): string {
@@ -596,7 +610,15 @@ function ConversationsView() {
   const { user } = useSession();
   const podeEnviar = user?.perfil !== "estagio";
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const router = useRouter();
   const searchParams = useSearchParams();
+
+  const [novaConversaOpen, setNovaConversaOpen] = useState(false);
+  const [novaConversaTelefone, setNovaConversaTelefone] = useState("");
+  const [novaConversaInstancia, setNovaConversaInstancia] = useState<"ads" | "indicacoes">("ads");
+  const [novaConversaNome, setNovaConversaNome] = useState("");
+  const [novaConversaMensagem, setNovaConversaMensagem] = useState("");
+  const [iniciandoConversa, setIniciandoConversa] = useState(false);
   const leadParam = searchParams.get("lead");
   const appliedLeadParamRef = useRef(false);
   const [draft, setDraft] = useState("");
@@ -1088,6 +1110,52 @@ function ConversationsView() {
     }
   };
 
+  const handleIniciarConversa = async () => {
+    const numero = novaConversaTelefone.replace(/\D/g, "");
+    const mensagem = novaConversaMensagem.trim();
+
+    if (!numero || !mensagem) {
+      toast.error("Preencha o telefone e a mensagem inicial.");
+      return;
+    }
+
+    setIniciandoConversa(true);
+    try {
+      const res = await fetch("/api/leads/iniciar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numero_whatsapp: numero,
+          instancia: novaConversaInstancia,
+          nome: novaConversaNome.trim() || undefined,
+          mensagem_inicial: mensagem,
+        }),
+      });
+
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(body?.error ?? "Não foi possível iniciar a conversa.");
+        return;
+      }
+
+      setNovaConversaOpen(false);
+      setNovaConversaTelefone("");
+      setNovaConversaInstancia("ads");
+      setNovaConversaNome("");
+      setNovaConversaMensagem("");
+
+      mutateAllLists();
+      setActiveTab("humano");
+      setSelectedLeadId(body.lead_id);
+      router.push(`/dashboard/conversas?lead=${body.lead_id}`);
+      toast.success(body.criado ? "Conversa iniciada." : "Mensagem enviada ao lead existente.");
+    } catch {
+      toast.error("Erro de conexão ao iniciar a conversa.");
+    } finally {
+      setIniciandoConversa(false);
+    }
+  };
+
   const handleResetConversa = async () => {
     if (!activeLeadId) return;
     setResetting(true);
@@ -1253,6 +1321,19 @@ function ConversationsView() {
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Sidebar */}
         <div className="flex w-full max-w-sm flex-col overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a]">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 shrink-0">
+            <h2 className="text-sm font-semibold text-white">Conversas</h2>
+            <button
+              onClick={() => setNovaConversaOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Nova conversa"
+              title="Nova conversa"
+            >
+              <PencilLine className="h-4 w-4" />
+            </button>
+          </div>
+
           {/* Tabs */}
           <div className="grid grid-cols-4 border-b border-white/10 text-xs shrink-0">
             <button
@@ -1787,6 +1868,68 @@ function ConversationsView() {
             </Button>
             <Button disabled={savingEdicao} onClick={salvarEdicaoAgendada}>
               {savingEdicao ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={novaConversaOpen} onOpenChange={setNovaConversaOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova conversa</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/60">Telefone</label>
+              <input
+                type="text"
+                value={novaConversaTelefone}
+                onChange={(e) => setNovaConversaTelefone(formatTelefoneBR(e.target.value))}
+                placeholder="55 71 99999-9999"
+                className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/60">Instância</label>
+              <select
+                value={novaConversaInstancia}
+                onChange={(e) => setNovaConversaInstancia(e.target.value as "ads" | "indicacoes")}
+                className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+              >
+                <option value="ads">ADS</option>
+                <option value="indicacoes">INDICAÇÕES</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/60">Nome (opcional)</label>
+              <input
+                type="text"
+                value={novaConversaNome}
+                onChange={(e) => setNovaConversaNome(e.target.value)}
+                placeholder="Nome do lead"
+                className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-white/60">Mensagem inicial</label>
+              <textarea
+                value={novaConversaMensagem}
+                onChange={(e) => setNovaConversaMensagem(e.target.value)}
+                rows={4}
+                placeholder="Digite a mensagem que será enviada ao lead"
+                className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setNovaConversaOpen(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={iniciandoConversa} onClick={handleIniciarConversa}>
+              {iniciandoConversa ? "Iniciando..." : "Iniciar Conversa"}
             </Button>
           </div>
         </DialogContent>
