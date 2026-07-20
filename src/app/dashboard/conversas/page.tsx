@@ -1251,6 +1251,26 @@ function ConversationsView() {
   const handleSend = async () => {
     if (!activeLeadId) return;
 
+    if (draft.trim().toLowerCase() === "/restart") {
+      const leadIdParaResetar = activeLeadId;
+      setDraft("");
+      try {
+        const res = await fetch(`/api/leads/${leadIdParaResetar}/resetar`, { method: "POST" });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          toast.error(body?.error ?? "Não foi possível resetar a conversa.");
+          return;
+        }
+        setSelectedLeadId(null);
+        mutateAllLists();
+        router.push("/dashboard/conversas");
+        toast.success("Conversa resetada");
+      } catch {
+        toast.error("Erro de conexão ao resetar a conversa.");
+      }
+      return;
+    }
+
     if (draft.trim().toLowerCase() === "/resetar") {
       setResetConfirmOpen(true);
       return;
