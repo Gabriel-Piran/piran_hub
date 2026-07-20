@@ -35,3 +35,26 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # piran_hub
+
+## Webhook Z-API
+
+O Piran Hub concentra o recebimento de webhooks do Z-API e intercepta os comandos
+`/restart`, `/parar` e `/ia` antes de repassar a mensagem para o n8n.
+
+No painel do Z-API, configure o webhook **"Ao receber"** (message received) da
+instância para apontar para:
+
+```
+https://piranhub-production.up.railway.app/api/webhook/zapi
+```
+
+O endpoint (`POST /api/webhook/zapi` — rota pública, sem autenticação, já
+liberada no `middleware.ts`):
+
+- ignora mensagens enviadas pelo próprio número (`fromMe: true`);
+- `/restart`: apaga o lead completamente (mensagens, fila de follow-up e o lead);
+- `/parar`: muda `modo_atendimento` do lead para `humano`;
+- `/ia`: muda `modo_atendimento` do lead de volta para `ia`;
+- qualquer outro conteúdo é repassado sem alterações para
+  `https://n8n-production-d971c.up.railway.app/webhook/evolution-webhook`,
+  que continua responsável pelo fluxo de atendimento normal.

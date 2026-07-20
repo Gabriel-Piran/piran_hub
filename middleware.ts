@@ -119,7 +119,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/health" ||
     pathname.startsWith("/api/internal/") ||
     pathname === "/api/regras-condicionais/verificar" ||
-    pathname === "/api/leads/resetar-por-numero"
+    pathname === "/api/leads/resetar-por-numero" ||
+    pathname === "/api/webhook/zapi"
   ) {
     return NextResponse.next();
   }
