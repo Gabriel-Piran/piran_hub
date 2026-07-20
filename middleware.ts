@@ -118,7 +118,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health" ||
     pathname.startsWith("/api/internal/") ||
-    pathname === "/api/regras-condicionais/verificar"
+    pathname === "/api/regras-condicionais/verificar" ||
+    pathname === "/api/leads/resetar-por-numero"
   ) {
     return NextResponse.next();
   }

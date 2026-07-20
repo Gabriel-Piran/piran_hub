@@ -65,3 +65,50 @@ export async function restartLeadAtendimento(
 
   return { ok: true, status: 200, lead: data };
 }
+
+export interface DeletarLeadResultado {
+  ok: boolean;
+  status: number;
+  error?: string;
+}
+
+export async function deletarLeadCompleto(
+  supabase: SupabaseClient,
+  leadId: string
+): Promise<DeletarLeadResultado> {
+  const { data: lead, error: leadError } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (leadError) {
+    return { ok: false, status: 500, error: leadError.message };
+  }
+  if (!lead) {
+    return { ok: false, status: 404, error: "Lead não encontrado" };
+  }
+
+  const { error: mensagensError } = await supabase
+    .from("mensagens")
+    .delete()
+    .eq("lead_id", leadId);
+  if (mensagensError) {
+    return { ok: false, status: 500, error: mensagensError.message };
+  }
+
+  const { error: filaError } = await supabase
+    .from("followup_fila")
+    .delete()
+    .eq("lead_id", leadId);
+  if (filaError) {
+    return { ok: false, status: 500, error: filaError.message };
+  }
+
+  const { error: leadDeleteError } = await supabase.from("leads").delete().eq("id", leadId);
+  if (leadDeleteError) {
+    return { ok: false, status: 500, error: leadDeleteError.message };
+  }
+
+  return { ok: true, status: 200 };
+}
