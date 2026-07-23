@@ -124,6 +124,26 @@ export async function executarAcao(
     }
 
     case "contrato": {
+      const CAMPOS_OBRIGATORIOS: [keyof typeof lead, string][] = [
+        ["nome", "nome"],
+        ["cpf", "CPF"],
+        ["data_nascimento", "data de nascimento"],
+        ["nome_mae", "nome da mãe"],
+        ["logradouro", "logradouro"],
+        ["numero_end", "número do endereço"],
+        ["bairro", "bairro"],
+        ["cidade", "cidade"],
+        ["estado", "estado"],
+        ["cep", "CEP"],
+      ];
+      const faltando = CAMPOS_OBRIGATORIOS.filter(([campo]) => !lead[campo]).map(([, label]) => label);
+
+      if (faltando.length > 0) {
+        const erro = `Dados incompletos para gerar o contrato: falta ${faltando.join(", ")}.`;
+        await notificar(supabase, leadId, erro);
+        return { ok: false, status: 400, error: erro };
+      }
+
       const resultado = await gerarContrato(leadId);
       if (!resultado.ok) {
         return { ok: false, status: resultado.status, error: resultado.error, resultado: resultado.resultado };
