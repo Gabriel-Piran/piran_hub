@@ -147,11 +147,7 @@ function PromptEditor({
       }
 
       onSaved(body as PromptAline);
-      toast.success(
-        body.sincronizado
-          ? "Prompt salvo e sincronizado com a Aline."
-          : "Prompt salvo, mas a sincronização automática com o n8n falhou. A Aline pode demorar a refletir a mudança."
-      );
+      toast.success("Prompt salvo — a Aline já usa a nova versão a partir da próxima mensagem.");
     } catch {
       toast.error("Erro de conexão ao salvar.");
     } finally {

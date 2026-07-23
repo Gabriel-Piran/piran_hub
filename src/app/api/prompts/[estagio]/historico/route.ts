@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase";
-import { LEAD_ESTAGIOS } from "@/types";
-import type { LeadEstagio } from "@/types";
 
 function isAdmin(request: Request) {
   return request.headers.get("x-user-perfil") === "admin";
@@ -17,9 +15,6 @@ export async function GET(
   }
 
   const { estagio } = await params;
-  if (!LEAD_ESTAGIOS.includes(estagio as LeadEstagio)) {
-    return NextResponse.json({ error: "Estágio inválido" }, { status: 400 });
-  }
 
   const supabase = supabaseAdmin();
   const { data, error } = await supabase

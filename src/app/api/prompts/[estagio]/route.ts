@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase";
-import { LEAD_ESTAGIOS } from "@/types";
-import type { LeadEstagio } from "@/types";
 
 const PROMPT_COLUMNS = "id, estagio, titulo, descricao, conteudo, ativo, atualizado_em";
 
@@ -10,18 +8,10 @@ function isAdmin(request: Request) {
   return request.headers.get("x-user-perfil") === "admin";
 }
 
-async function notificarN8n(): Promise<boolean> {
-  const url = process.env.N8N_SINCRONIZAR_PROMPTS_URL;
-  if (!url) return false;
-
-  try {
-    const res = await fetch(url, { method: "POST" });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
+// A Aline (node "Busca Prompt" do workflow n8n) lê o conteúdo desta tabela
+// direto do Postgres a cada mensagem — não existe cache nem webhook de
+// sincronização a acionar aqui; salvar já é o suficiente para valer na
+// próxima mensagem do lead.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ estagio: string }> }
@@ -31,9 +21,6 @@ export async function PATCH(
   }
 
   const { estagio } = await params;
-  if (!LEAD_ESTAGIOS.includes(estagio as LeadEstagio)) {
-    return NextResponse.json({ error: "Estágio inválido" }, { status: 400 });
-  }
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -81,7 +68,5 @@ export async function PATCH(
     return NextResponse.json({ error: "Prompt não encontrado para esse estágio" }, { status: 404 });
   }
 
-  const sincronizado = await notificarN8n();
-
-  return NextResponse.json({ ...data, sincronizado });
+  return NextResponse.json(data);
 }

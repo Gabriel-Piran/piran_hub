@@ -2,7 +2,9 @@ export type LeadEstagio = string;
 
 export const LEAD_ESTAGIOS: LeadEstagio[] = [
   "RECEPCAO",
+  "COM_CTPS",
   "TRIAGEM_DOMESTICO",
+  "TRIAGEM_DIAS_DOMESTICO",
   "QUALIFICACAO_SALARIO",
   "QUALIFICACAO_TEMPO",
   "QUALIFICACAO_SAIDA",
