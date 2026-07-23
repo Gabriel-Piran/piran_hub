@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig } from "@/lib/zapi";
+import { ensureMidiasBucketPublico } from "@/lib/supabase-storage";
 
 /**
  * O navegador grava em WebM/Opus, MP4/AAC (Safari) ou, raramente, Ogg,
@@ -50,23 +51,6 @@ async function transcodeToMp3(input: Buffer): Promise<Buffer> {
     return await readFile(outputPath);
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
-  }
-}
-
-/**
- * Garante que o bucket 'midias' existe e é público. Sem isso, a URL gerada
- * por getPublicUrl() aponta para um arquivo inacessível (404/403), e a
- * Z-API recebe uma página de erro em vez de áudio ao tentar buscá-la —
- * o que aparece como "Fail to convert audio" sem indicar a causa real.
- */
-async function ensureMidiasBucketPublico(supabase: ReturnType<typeof supabaseAdmin>) {
-  const { data: buckets } = await supabase.storage.listBuckets();
-  const bucket = buckets?.find((b) => b.name === "midias");
-
-  if (!bucket) {
-    await supabase.storage.createBucket("midias", { public: true });
-  } else if (!bucket.public) {
-    await supabase.storage.updateBucket("midias", { public: true });
   }
 }
 

@@ -1,4 +1,22 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { supabaseAdmin } from "./supabase";
+
+/**
+ * Garante que o bucket 'midias' existe e é público. Sem isso, a URL gerada
+ * por getPublicUrl() aponta para um arquivo inacessível (404/403) — tanto
+ * ao reenviar mídia recebida do lead quanto ao mandar mídia via Z-API.
+ */
+export async function ensureMidiasBucketPublico(supabase: SupabaseClient) {
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const bucket = buckets?.find((b) => b.name === "midias");
+
+  if (!bucket) {
+    await supabase.storage.createBucket("midias", { public: true });
+  } else if (!bucket.public) {
+    await supabase.storage.updateBucket("midias", { public: true });
+  }
+}
 
 export async function ensureBuckets() {
   const supabase = supabaseAdmin();

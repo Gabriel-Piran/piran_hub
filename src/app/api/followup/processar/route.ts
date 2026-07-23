@@ -2,14 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig, type ZapiInstancia } from "@/lib/zapi";
 import { shuffle, isEligibleDay, getNextEligibleDay } from "@/lib/followup-scheduler";
-
-function autorizado(request: Request): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true;
-  const clientSecret =
-    request.headers.get("x-cron-secret") || new URL(request.url).searchParams.get("secret");
-  return clientSecret === cronSecret;
-}
+import { autorizadoCron } from "@/lib/cron";
 
 async function calcularProximoAgendamento(
   regra: {
@@ -224,7 +217,7 @@ async function processarFila() {
 }
 
 export async function GET(request: Request) {
-  if (!autorizado(request)) {
+  if (!autorizadoCron(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -233,7 +226,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!autorizado(request)) {
+  if (!autorizadoCron(request)) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
