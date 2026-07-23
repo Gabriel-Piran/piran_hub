@@ -24,37 +24,45 @@ export async function POST(request: Request) {
 
   const supabase = supabaseAdmin();
 
-  const { data: leadExistente, error: buscaError } = await supabase
-    .from("leads")
-    .select("id")
-    .eq("numero_whatsapp", numeroWhatsapp)
-    .maybeSingle();
-
-  if (buscaError) {
-    return NextResponse.json({ error: buscaError.message }, { status: 500 });
-  }
-
-  let leadId = leadExistente?.id as string | undefined;
+  let leadId: string | undefined;
   let criado = false;
 
-  if (!leadId) {
-    const { data: novoLead, error: insertError } = await supabase
-      .from("leads")
-      .insert({
-        numero_whatsapp: numeroWhatsapp,
-        instancia,
-        nome: nome || null,
-        estagio: "RECEPCAO",
-        status: "ativo",
-        modo_atendimento: "humano",
-      })
-      .select("id")
-      .single();
+  const { data: novoLead, error: insertError } = await supabase
+    .from("leads")
+    .insert({
+      numero_whatsapp: numeroWhatsapp,
+      instancia,
+      nome: nome || null,
+      estagio: "RECEPCAO",
+      status: "ativo",
+      modo_atendimento: "humano",
+    })
+    .select("id")
+    .single();
 
-    if (insertError) {
+  if (insertError) {
+    // 23505 = unique_violation (leads_numero_whatsapp_key): outra chamada
+    // concorrente já criou o lead para este número — usa o existente em
+    // vez de criar um segundo lead para a mesma conversa.
+    if (insertError.code !== "23505") {
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    const { data: leadExistente, error: buscaError } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("numero_whatsapp", numeroWhatsapp)
+      .single();
+
+    if (buscaError || !leadExistente) {
+      return NextResponse.json(
+        { error: buscaError?.message ?? "Lead não encontrado após conflito" },
+        { status: 500 }
+      );
+    }
+
+    leadId = leadExistente.id;
+  } else {
     leadId = novoLead.id;
     criado = true;
   }

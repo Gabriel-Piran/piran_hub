@@ -27,7 +27,7 @@ export async function agendarFollowupsParaRegra(regraId: string): Promise<number
     .from("leads")
     .select("id")
     .eq("estagio", regra.estagio_gatilho)
-    .lte("atualizado_em", limite.toISOString())
+    .lte("estagio_atualizado_em", limite.toISOString())
     .eq("status", "ativo");
 
   if (leadsError) {
@@ -76,6 +76,7 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
   const horarioInicio = regra.horario_inicio || "08:00";
   const horarioFim = regra.horario_fim || "18:00";
   const intervalMin = regra.intervalo_minutos_min || 1;
+  const intervalMax = Math.max(regra.intervalo_minutos_max || intervalMin, intervalMin);
   const diasSemana = regra.dias_semana || ["1", "2", "3", "4", "5"];
 
   let texto = regra.mensagem_texto || "";
@@ -100,15 +101,25 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
     throw new Error("Janela de horário comercial inválida.");
   }
 
-  const slotsPerDay = Math.floor(totalWindowMinutes / intervalMin);
-  if (slotsPerDay <= 0) {
+  if (intervalMin > totalWindowMinutes) {
     throw new Error("Intervalo mínimo de minutos é maior que a janela disponível.");
   }
 
   let currentLeadIndex = 0;
   let currentDate = new Date(); // Start scheduling from now
 
-  const queuedItems: any[] = [];
+  interface FollowupFilaItem {
+    lead_id: string;
+    regra_id: string;
+    mensagem_texto: string;
+    midia_url: string | null;
+    tipo: string;
+    agendado_para: string;
+    status: string;
+    tentativas: number;
+  }
+
+  const queuedItems: FollowupFilaItem[] = [];
 
   while (currentLeadIndex < leadIds.length) {
     // Check if currentDate is eligible
@@ -117,12 +128,13 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
       continue;
     }
 
-    // Generate slots for currentDate
+    // Generate slots for currentDate, com intervalo aleatório entre
+    // intervalMin e intervalMax minutos (evita cadência robótica).
     const slots: Date[] = [];
-    for (let i = 0; i < slotsPerDay; i++) {
+    for (let offset = 0; offset < totalWindowMinutes; offset += randomInterval(intervalMin, intervalMax)) {
       const slotDate = new Date(currentDate);
       slotDate.setHours(startHour, startMin, 0, 0);
-      slotDate.setMinutes(slotDate.getMinutes() + i * intervalMin);
+      slotDate.setMinutes(slotDate.getMinutes() + offset);
 
       // Only schedule in the future
       if (slotDate.getTime() > Date.now()) {
@@ -177,6 +189,10 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
   }
 
   return queuedItems.length;
+}
+
+export function randomInterval(min: number, max: number): number {
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
 
 export function shuffle<T>(array: T[]): T[] {

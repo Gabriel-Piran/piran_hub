@@ -217,3 +217,13 @@ export interface PromptAline {
   ativo: boolean;
   atualizado_em: string;
 }
+
+export interface PromptAlineHistorico {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  conteudo: string;
+  ativo: boolean;
+  editado_por: string | null;
+  criado_em: string;
+}

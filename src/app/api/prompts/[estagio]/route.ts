@@ -47,6 +47,25 @@ export async function PATCH(
   if ("ativo" in body) updates.ativo = Boolean(body.ativo);
 
   const supabase = supabaseAdmin();
+
+  const { data: atual } = await supabase
+    .from("prompts_aline")
+    .select(PROMPT_COLUMNS)
+    .eq("estagio", estagio)
+    .maybeSingle();
+
+  if (atual) {
+    await supabase.from("prompts_aline_historico").insert({
+      prompt_id: atual.id,
+      estagio: atual.estagio,
+      titulo: atual.titulo,
+      descricao: atual.descricao,
+      conteudo: atual.conteudo,
+      ativo: atual.ativo,
+      editado_por: request.headers.get("x-user-email"),
+    });
+  }
+
   const { data, error } = await supabase
     .from("prompts_aline")
     .update(updates)

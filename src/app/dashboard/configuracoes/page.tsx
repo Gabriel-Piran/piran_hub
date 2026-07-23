@@ -6,6 +6,7 @@ import useSWR from "swr";
 import {
   Building2,
   Clock,
+  GitBranch,
   Megaphone,
   MessageSquareText,
   Share2,
@@ -356,6 +357,21 @@ function ConfiguracoesView() {
                 <p className="text-sm text-white">Regras condicionais</p>
                 <p className="text-xs text-white/40">
                   Executa ações automaticamente por palavra-chave na conversa
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          <Link
+            href="/dashboard/configuracoes/arvore"
+            className="flex items-center justify-between rounded-lg border border-white/10 px-4 py-3 transition-colors hover:border-[#c9a84c]/40"
+          >
+            <div className="flex items-center gap-3">
+              <GitBranch className="h-5 w-5 text-[#c9a84c]" />
+              <div>
+                <p className="text-sm text-white">Árvore de decisão</p>
+                <p className="text-xs text-white/40">
+                  Visualize os gatilhos (@ e palavras-chave) e para onde cada um leva o lead
                 </p>
               </div>
             </div>

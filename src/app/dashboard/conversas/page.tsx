@@ -181,6 +181,22 @@ function MensagensAgendadasPanel({
   );
 }
 
+const EXTENSOES_IMAGEM = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"];
+const EXTENSOES_AUDIO = [".ogg", ".mp3", ".wav", ".m4a", ".opus", ".aac"];
+
+function inferirTipoMidia(tipo: string | undefined, url: string): "audio" | "imagem" | "documento" | null {
+  const tipoNormalizado = (tipo ?? "").toLowerCase();
+  if (["audio", "áudio", "voice", "ptt"].includes(tipoNormalizado)) return "audio";
+  if (["imagem", "image", "img", "photo", "picture"].includes(tipoNormalizado)) return "imagem";
+  if (["documento", "document", "doc", "file"].includes(tipoNormalizado)) return "documento";
+
+  const urlSemQuery = url.split("?")[0].toLowerCase();
+  if (EXTENSOES_IMAGEM.some((ext) => urlSemQuery.endsWith(ext))) return "imagem";
+  if (EXTENSOES_AUDIO.some((ext) => urlSemQuery.endsWith(ext))) return "audio";
+
+  return null;
+}
+
 function MessageBubbleContent({
   mensagem,
   onOpenLightbox,
@@ -188,7 +204,9 @@ function MessageBubbleContent({
   mensagem: Mensagem;
   onOpenLightbox: (url: string) => void;
 }) {
-  if (mensagem.tipo === "audio" && mensagem.midia_url) {
+  const tipoInferido = mensagem.midia_url ? inferirTipoMidia(mensagem.tipo, mensagem.midia_url) : null;
+
+  if (tipoInferido === "audio" && mensagem.midia_url) {
     return (
       <div className="py-1">
         <audio src={mensagem.midia_url} controls className="max-w-full outline-none" />
@@ -196,7 +214,7 @@ function MessageBubbleContent({
     );
   }
 
-  if (mensagem.tipo === "imagem" && mensagem.midia_url) {
+  if (tipoInferido === "imagem" && mensagem.midia_url) {
     return (
       <div className="py-1">
         <img
@@ -209,7 +227,7 @@ function MessageBubbleContent({
     );
   }
 
-  if (mensagem.tipo === "documento" && mensagem.midia_url) {
+  if ((tipoInferido === "documento" || tipoInferido === null) && mensagem.midia_url) {
     return (
       <div className="py-1 flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 min-w-[200px] max-w-sm">
         <FileText className="h-8 w-8 text-[#c9a84c] shrink-0" />
@@ -1597,7 +1615,10 @@ function ConversationsView() {
                       lead={lead}
                       estagios={estagios}
                       estagiosMap={estagiosMap}
-                      onUpdate={mutateAllLists}
+                      onUpdate={() => {
+                        mutateAllLists();
+                        mutate();
+                      }}
                     />
                     
                     {/* Modo Atendimento Badge */}
