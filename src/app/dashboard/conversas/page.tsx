@@ -27,7 +27,7 @@ import type {
   ModoAtendimento,
 } from "@/types";
 import { MODO_ATENDIMENTO_LABELS } from "@/types";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -257,11 +257,13 @@ function MessageBubbleContent({
 function ChatBubble({
   mensagem,
   leadName,
+  leadFoto,
   onCancelarAgendamento,
   onOpenLightbox,
 }: {
   mensagem: Mensagem;
   leadName: string;
+  leadFoto?: string | null;
   onCancelarAgendamento: (id: string) => void;
   onOpenLightbox: (url: string) => void;
 }) {
@@ -310,6 +312,7 @@ function ChatBubble({
     return (
       <div className="flex items-start gap-2.5 my-2 justify-start">
         <Avatar className="h-8 w-8 shrink-0 bg-neutral-800 text-neutral-300">
+          {leadFoto && <AvatarImage src={leadFoto} alt={leadName} />}
           <AvatarFallback className="bg-neutral-800 text-neutral-300 text-xs font-semibold">
             {initials(leadName)}
           </AvatarFallback>
@@ -1597,6 +1600,7 @@ function ConversationsView() {
               <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-4">
                 <div className="flex items-center gap-3 flex-wrap">
                   <Avatar className="h-10 w-10 shrink-0">
+                    {lead.foto_perfil_url && <AvatarImage src={lead.foto_perfil_url} alt={lead.nome} />}
                     <AvatarFallback>{initials(lead.nome)}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
@@ -1704,6 +1708,7 @@ function ConversationsView() {
                     key={mensagem.id}
                     mensagem={mensagem}
                     leadName={lead.nome}
+                    leadFoto={lead.foto_perfil_url}
                     onCancelarAgendamento={handleCancelarAgendamento}
                     onOpenLightbox={setLightboxUrl}
                   />

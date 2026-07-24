@@ -38,6 +38,7 @@ export interface Lead {
   id: string;
   nome: string;
   nome_whatsapp?: string | null;
+  foto_perfil_url?: string | null;
   numero_whatsapp: string;
   instancia: Instancia;
   estagio: LeadEstagio;

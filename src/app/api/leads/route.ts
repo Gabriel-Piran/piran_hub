@@ -4,10 +4,10 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { resolveDepartamentoRestricao } from "@/lib/departamentos-acesso";
 
 const LEAD_COLUMNS =
-  "id, nome, nome_whatsapp, numero_whatsapp, instancia, estagio, status, modo_atendimento, departamento_id, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em, ultima_mensagem_conteudo, ultima_mensagem_enviado_em";
+  "id, nome, nome_whatsapp, foto_perfil_url, numero_whatsapp, instancia, estagio, status, modo_atendimento, departamento_id, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em, ultima_mensagem_conteudo, ultima_mensagem_enviado_em";
 
 const LEAD_COLUMNS_WITHOUT_MESSAGES =
-  "id, nome, nome_whatsapp, numero_whatsapp, instancia, estagio, status, modo_atendimento, departamento_id, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em";
+  "id, nome, nome_whatsapp, foto_perfil_url, numero_whatsapp, instancia, estagio, status, modo_atendimento, departamento_id, salario, cpf, data_nascimento, nome_mae, logradouro, numero_end, bairro, cidade, estado, cep, criado_em, atualizado_em";
 
 function csv(value: string | null): string[] | null {
   if (!value) return null;
