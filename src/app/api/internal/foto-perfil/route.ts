@@ -17,6 +17,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "lead_id é obrigatório" }, { status: 400 });
   }
 
-  const resultado = await sincronizarFotoPerfil(leadId);
-  return NextResponse.json(resultado, { status: resultado.ok ? 200 : resultado.status });
+  try {
+    const resultado = await sincronizarFotoPerfil(leadId);
+    return NextResponse.json(resultado, { status: resultado.ok ? 200 : resultado.status });
+  } catch (err) {
+    return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
+  }
 }

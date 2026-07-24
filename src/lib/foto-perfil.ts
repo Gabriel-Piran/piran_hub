@@ -51,8 +51,10 @@ export async function sincronizarFotoPerfil(leadId: string): Promise<Sincronizar
   const linkBody = await linkRes.json().catch(() => null);
   const link = linkBody?.link;
 
-  // Nem todo contato tem foto pública — não é erro, só não tem o que salvar.
-  if (!link || typeof link !== "string") {
+  // Nem todo contato tem foto pública — a Z-API retorna
+  // { link: "null", errorMessage: "item-not-found" } nesse caso (a
+  // string "null", não o valor null), então precisa checar os dois.
+  if (!link || typeof link !== "string" || link === "null" || linkBody?.errorMessage) {
     return { ok: true, status: 200, foto_perfil_url: null };
   }
 
