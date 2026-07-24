@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveDepartamentoRestricao } from "@/lib/departamentos-acesso";
+import { calcularFollowupsPrevistos } from "@/lib/followup-scheduler";
 import { LEAD_ESTAGIOS } from "@/types";
 import type { LeadEstagio, LeadStatus } from "@/types";
 
@@ -89,6 +90,21 @@ export async function GET(
     };
   });
 
+  const previstos = await calcularFollowupsPrevistos(id);
+  const mensagensPrevistasFollowup = previstos.map((p) => ({
+    id: `previsto:${p.lead_id}:${p.regra_id}`,
+    lead_id: id,
+    conteudo: p.mensagem_texto || "",
+    role: "sistema" as const,
+    tipo: "texto",
+    enviado_em: p.previsto_para,
+    agendado_para: p.previsto_para,
+    acao_executada: null,
+    midia_url: null,
+    origem: "followup_previsto" as const,
+    followup_regra_nome: p.regra_nome,
+  }));
+
   return NextResponse.json({
     ...lead,
     nome: lead.nome || "",
@@ -96,7 +112,7 @@ export async function GET(
     estagio: lead.estagio || "RECEPCAO",
     status: lead.status || "ativo",
     mensagens: (mensagens ?? []).map((m) => ({ ...m, conteudo: m.conteudo || "", origem: "manual" as const })),
-    mensagens_agendadas_followup: mensagensAgendadasFollowup,
+    mensagens_agendadas_followup: [...mensagensAgendadasFollowup, ...mensagensPrevistasFollowup],
   });
 }
 

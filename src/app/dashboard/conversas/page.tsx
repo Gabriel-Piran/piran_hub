@@ -146,14 +146,17 @@ function MensagensAgendadasPanel({
           )}
           {mensagens.map((m) => {
             const isFollowup = m.origem === "followup";
+            const isPrevisto = m.origem === "followup_previsto";
             return (
               <div
                 key={m.id}
                 className={cn(
                   "flex items-center gap-3 rounded-md border px-3 py-2",
-                  isFollowup
-                    ? "border-sky-500/20 bg-sky-500/5"
-                    : "border-orange-500/20 bg-orange-500/5"
+                  isPrevisto
+                    ? "border-dashed border-sky-500/20 bg-sky-500/5"
+                    : isFollowup
+                      ? "border-sky-500/20 bg-sky-500/5"
+                      : "border-orange-500/20 bg-orange-500/5"
                 )}
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -164,19 +167,21 @@ function MensagensAgendadasPanel({
                   <Badge
                     className={cn(
                       "w-fit gap-1 text-[10px]",
-                      isFollowup
+                      isFollowup || isPrevisto
                         ? "border-sky-500/40 bg-sky-500/10 text-sky-400"
                         : "border-orange-500/40 bg-orange-500/10 text-orange-400"
                     )}
                   >
                     <Clock className="h-3 w-3" />
-                    {isFollowup
-                      ? `Follow-up${m.followup_regra_nome ? ` (${m.followup_regra_nome})` : ""}`
-                      : "Aguardando envio"}{" "}
+                    {isPrevisto
+                      ? `Previsto: ${m.followup_regra_nome ?? "follow-up"}`
+                      : isFollowup
+                        ? `Follow-up${m.followup_regra_nome ? ` (${m.followup_regra_nome})` : ""}`
+                        : "Aguardando envio"}{" "}
                     {m.agendado_para ? formatAgendadoAmigavel(m.agendado_para) : ""}
                   </Badge>
                 </div>
-                {!isFollowup && (
+                {!isFollowup && !isPrevisto && (
                   <button
                     onClick={() => onEditar(m)}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-white"
@@ -185,13 +190,15 @@ function MensagensAgendadasPanel({
                     <Pencil className="h-4 w-4" />
                   </button>
                 )}
-                <button
-                  onClick={() => onCancelar(m.id)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
-                  aria-label="Cancelar mensagem agendada"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                {!isPrevisto && (
+                  <button
+                    onClick={() => onCancelar(m.id)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
+                    aria-label="Cancelar mensagem agendada"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             );
           })}

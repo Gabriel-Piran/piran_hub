@@ -204,6 +204,85 @@ export function shuffle<T>(array: T[]): T[] {
   return arr;
 }
 
+export interface FollowupPrevisto {
+  lead_id: string;
+  lead_nome: string;
+  lead_numero_whatsapp: string;
+  regra_id: string;
+  regra_nome: string;
+  mensagem_texto: string;
+  previsto_para: string;
+}
+
+/**
+ * Leads que já estão no estágio-gatilho de alguma regra ativa mas ainda não
+ * completaram os dias_espera (por isso não têm linha real em followup_fila
+ * — agendarFollowupsParaRegra só cria a linha quando o lead já está
+ * elegível AGORA). Calculado sob demanda, sem gravar nada no banco, só pra
+ * dar visibilidade do que "está por vir" na fila e no painel da conversa.
+ */
+export async function calcularFollowupsPrevistos(leadId?: string): Promise<FollowupPrevisto[]> {
+  const supabase = supabaseAdmin();
+
+  const { data: regras } = await supabase
+    .from("followup_regras")
+    .select("*, mensagens_rapidas(*)")
+    .eq("ativo", true);
+
+  if (!regras || regras.length === 0) return [];
+
+  const previstos: FollowupPrevisto[] = [];
+
+  for (const regra of regras) {
+    let query = supabase
+      .from("leads")
+      .select("id, nome, numero_whatsapp, estagio_atualizado_em")
+      .eq("estagio", regra.estagio_gatilho)
+      .eq("status", "ativo");
+    if (leadId) query = query.eq("id", leadId);
+
+    const { data: leads } = await query;
+    if (!leads || leads.length === 0) continue;
+
+    const { data: sent } = await supabase
+      .from("followups_enviados")
+      .select("lead_id")
+      .eq("regra_id", regra.id);
+    const sentIds = new Set((sent ?? []).map((s) => s.lead_id));
+
+    const { data: queued } = await supabase
+      .from("followup_fila")
+      .select("lead_id")
+      .eq("regra_id", regra.id)
+      .in("status", ["pendente", "enviado"]);
+    const queuedIds = new Set((queued ?? []).map((q) => q.lead_id));
+
+    let texto = regra.mensagem_texto || "";
+    if (regra.mensagens_rapidas) texto = regra.mensagens_rapidas.conteudo || "";
+
+    for (const lead of leads) {
+      if (sentIds.has(lead.id) || queuedIds.has(lead.id)) continue;
+
+      const previstoPara = new Date(lead.estagio_atualizado_em);
+      previstoPara.setDate(previstoPara.getDate() + regra.dias_espera);
+      const [h, m] = (regra.hora_envio || regra.horario_inicio || "08:00").split(":").map(Number);
+      previstoPara.setHours(h, m, 0, 0);
+
+      previstos.push({
+        lead_id: lead.id,
+        lead_nome: lead.nome || "Lead",
+        lead_numero_whatsapp: lead.numero_whatsapp || "",
+        regra_id: regra.id,
+        regra_nome: regra.nome,
+        mensagem_texto: texto,
+        previsto_para: previstoPara.toISOString(),
+      });
+    }
+  }
+
+  return previstos;
+}
+
 export function isEligibleDay(date: Date, diasSemana: string[]): boolean {
   const dayNum = date.getDay();
   const dayStr = dayNum === 0 ? "7" : String(dayNum);

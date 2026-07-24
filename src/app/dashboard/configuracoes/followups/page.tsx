@@ -526,6 +526,8 @@ function QueueMonitor({ regras }: { regras: any[] }) {
         return <Badge className="bg-red-500/20 text-red-400 border border-red-500/30">Erro</Badge>;
       case "cancelado":
         return <Badge className="bg-white/10 text-white/40 border border-white/5">Cancelado</Badge>;
+      case "previsto":
+        return <Badge className="bg-sky-500/20 text-sky-400 border border-sky-500/30">Previsto</Badge>;
       default:
         return <Badge variant="default">{s}</Badge>;
     }
@@ -548,6 +550,7 @@ function QueueMonitor({ regras }: { regras: any[] }) {
             className="rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#c9a84c]"
           >
             <option value="todos">Todos</option>
+            <option value="previsto">Previsto</option>
             <option value="pendente">Pendente</option>
             <option value="enviado">Enviado</option>
             <option value="erro">Erro</option>

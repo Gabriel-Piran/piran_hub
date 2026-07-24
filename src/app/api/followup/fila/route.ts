@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { calcularFollowupsPrevistos } from "@/lib/followup-scheduler";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       )
     `);
 
-  if (status && status !== "todos") {
+  if (status && status !== "todos" && status !== "previsto") {
     query = query.eq("status", status);
   }
   if (regraId && regraId !== "todos") {
@@ -45,13 +46,39 @@ export async function GET(request: Request) {
     }
   }
 
-  const { data: queue, error } = await query.order("agendado_para", { ascending: true });
+  const items: any[] = [];
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!status || status === "todos" || status === "previsto") {
+    const previstos = await calcularFollowupsPrevistos();
+    for (const p of previstos) {
+      if (regraId && regraId !== "todos" && p.regra_id !== regraId) continue;
+      if (data) {
+        const dia = p.previsto_para.slice(0, 10);
+        if (dia !== data) continue;
+      }
+      items.push({
+        id: `previsto:${p.lead_id}:${p.regra_id}`,
+        lead_id: p.lead_id,
+        regra_id: p.regra_id,
+        agendado_para: p.previsto_para,
+        status: "previsto",
+        leads: { nome: p.lead_nome, numero_whatsapp: p.lead_numero_whatsapp },
+        followup_regras: { nome: p.regra_nome },
+      });
+    }
   }
 
-  return NextResponse.json(queue);
+  if (status !== "previsto") {
+    const { data: queue, error } = await query.order("agendado_para", { ascending: true });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    items.push(...(queue ?? []));
+  }
+
+  items.sort((a, b) => (a.agendado_para || "").localeCompare(b.agendado_para || ""));
+
+  return NextResponse.json(items);
 }
 
 export async function PATCH(request: Request) {

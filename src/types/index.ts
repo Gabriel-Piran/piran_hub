@@ -79,7 +79,7 @@ export interface Mensagem {
   departamento_id?: string | null;
   midia_url?: string | null;
   enviado_por_atendente?: boolean;
-  origem?: "manual" | "followup";
+  origem?: "manual" | "followup" | "followup_previsto";
   followup_regra_nome?: string | null;
 }
 
