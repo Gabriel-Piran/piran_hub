@@ -65,13 +65,38 @@ export async function GET(
     return NextResponse.json({ error: mensagensError.message }, { status: 500 });
   }
 
+  const { data: followupsFila } = await supabase
+    .from("followup_fila")
+    .select("id, mensagem_texto, midia_url, tipo, agendado_para, followup_regras(nome)")
+    .eq("lead_id", id)
+    .eq("status", "pendente")
+    .order("agendado_para", { ascending: true });
+
+  const mensagensAgendadasFollowup = (followupsFila ?? []).map((f) => {
+    const regra = Array.isArray(f.followup_regras) ? f.followup_regras[0] : f.followup_regras;
+    return {
+      id: `followup:${f.id}`,
+      lead_id: id,
+      conteudo: f.mensagem_texto || "",
+      role: "sistema" as const,
+      tipo: f.tipo || "texto",
+      enviado_em: f.agendado_para,
+      agendado_para: f.agendado_para,
+      acao_executada: null,
+      midia_url: f.midia_url,
+      origem: "followup" as const,
+      followup_regra_nome: regra?.nome ?? null,
+    };
+  });
+
   return NextResponse.json({
     ...lead,
     nome: lead.nome || "",
     numero_whatsapp: lead.numero_whatsapp || "",
     estagio: lead.estagio || "RECEPCAO",
     status: lead.status || "ativo",
-    mensagens: (mensagens ?? []).map((m) => ({ ...m, conteudo: m.conteudo || "" })),
+    mensagens: (mensagens ?? []).map((m) => ({ ...m, conteudo: m.conteudo || "", origem: "manual" as const })),
+    mensagens_agendadas_followup: mensagensAgendadasFollowup,
   });
 }
 

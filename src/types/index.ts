@@ -13,6 +13,7 @@ export const LEAD_ESTAGIOS: LeadEstagio[] = [
   "COLETA_RG",
   "COLETA_ENDERECO",
   "CONTRATO",
+  "AGENDAMENTO",
   "AGUARDANDO",
 ];
 
@@ -78,6 +79,8 @@ export interface Mensagem {
   departamento_id?: string | null;
   midia_url?: string | null;
   enviado_por_atendente?: boolean;
+  origem?: "manual" | "followup";
+  followup_regra_nome?: string | null;
 }
 
 export interface Departamento {
@@ -134,6 +137,7 @@ export interface FollowupRegra {
 
 export interface LeadComMensagens extends Lead {
   mensagens: Mensagem[];
+  mensagens_agendadas_followup?: Mensagem[];
 }
 
 export type AcaoTipo =

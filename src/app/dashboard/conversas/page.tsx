@@ -144,37 +144,57 @@ function MensagensAgendadasPanel({
           {mensagens.length === 0 && (
             <p className="text-xs text-white/40">Nenhuma mensagem agendada para este lead.</p>
           )}
-          {mensagens.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-center gap-3 rounded-md border border-orange-500/20 bg-orange-500/5 px-3 py-2"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="truncate text-xs text-white/80">
-                  {(m.conteudo || "").slice(0, 50)}
-                  {(m.conteudo || "").length > 50 ? "..." : ""}
-                </span>
-                <Badge className="w-fit gap-1 border-orange-500/40 bg-orange-500/10 text-orange-400 text-[10px]">
-                  <Clock className="h-3 w-3" />
-                  Aguardando envio {m.agendado_para ? formatAgendadoAmigavel(m.agendado_para) : ""}
-                </Badge>
+          {mensagens.map((m) => {
+            const isFollowup = m.origem === "followup";
+            return (
+              <div
+                key={m.id}
+                className={cn(
+                  "flex items-center gap-3 rounded-md border px-3 py-2",
+                  isFollowup
+                    ? "border-sky-500/20 bg-sky-500/5"
+                    : "border-orange-500/20 bg-orange-500/5"
+                )}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="truncate text-xs text-white/80">
+                    {(m.conteudo || "").slice(0, 50)}
+                    {(m.conteudo || "").length > 50 ? "..." : ""}
+                  </span>
+                  <Badge
+                    className={cn(
+                      "w-fit gap-1 text-[10px]",
+                      isFollowup
+                        ? "border-sky-500/40 bg-sky-500/10 text-sky-400"
+                        : "border-orange-500/40 bg-orange-500/10 text-orange-400"
+                    )}
+                  >
+                    <Clock className="h-3 w-3" />
+                    {isFollowup
+                      ? `Follow-up${m.followup_regra_nome ? ` (${m.followup_regra_nome})` : ""}`
+                      : "Aguardando envio"}{" "}
+                    {m.agendado_para ? formatAgendadoAmigavel(m.agendado_para) : ""}
+                  </Badge>
+                </div>
+                {!isFollowup && (
+                  <button
+                    onClick={() => onEditar(m)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-white"
+                    aria-label="Editar mensagem agendada"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => onCancelar(m.id)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
+                  aria-label="Cancelar mensagem agendada"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                onClick={() => onEditar(m)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-white"
-                aria-label="Editar mensagem agendada"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => onCancelar(m.id)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
-                aria-label="Cancelar mensagem agendada"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -804,12 +824,16 @@ function ConversationsView() {
     return map;
   }, [estagios]);
 
-  const mensagensAgendadas = useMemo(
-    () => (lead?.mensagens ?? []).filter((m) => m.agendado_para && !m.acao_executada),
-    [lead]
-  );
+  const mensagensAgendadas = useMemo(() => {
+    const manuais = (lead?.mensagens ?? []).filter((m) => m.agendado_para && !m.acao_executada);
+    const followups = lead?.mensagens_agendadas_followup ?? [];
+    return [...manuais, ...followups].sort((a, b) =>
+      (a.agendado_para || "").localeCompare(b.agendado_para || "")
+    );
+  }, [lead]);
 
   const abrirEdicaoAgendada = (mensagem: Mensagem) => {
+    if (mensagem.origem === "followup") return;
     setEditandoAgendada(mensagem);
     setEditConteudo(mensagem.conteudo);
     setEditDataHora(mensagem.agendado_para ? toDatetimeLocalValue(mensagem.agendado_para) : "");
@@ -1158,11 +1182,18 @@ function ConversationsView() {
 
   const handleCancelarAgendamento = async (mensagemId: string) => {
     try {
-      const res = await fetch(`/api/mensagens/${mensagemId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ acao_executada: "cancelado" }),
-      });
+      const isFollowup = mensagemId.startsWith("followup:");
+      const res = isFollowup
+        ? await fetch(`/api/followup/fila`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: mensagemId.slice("followup:".length), acao: "cancelar" }),
+          })
+        : await fetch(`/api/mensagens/${mensagemId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ acao_executada: "cancelado" }),
+          });
       if (!res.ok) throw new Error();
       await mutate();
       toast.success("Agendamento cancelado.");
