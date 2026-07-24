@@ -61,6 +61,7 @@ export async function GET(request: Request) {
         lead_id: p.lead_id,
         regra_id: p.regra_id,
         agendado_para: p.previsto_para,
+        previsto_ate: p.previsto_ate,
         status: "previsto",
         leads: { nome: p.lead_nome, numero_whatsapp: p.lead_numero_whatsapp },
         followup_regras: { nome: p.regra_nome },

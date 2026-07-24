@@ -81,6 +81,7 @@ export interface Mensagem {
   enviado_por_atendente?: boolean;
   origem?: "manual" | "followup" | "followup_previsto";
   followup_regra_nome?: string | null;
+  previsto_ate?: string | null;
 }
 
 export interface Departamento {

@@ -103,6 +103,7 @@ export async function GET(
     midia_url: null,
     origem: "followup_previsto" as const,
     followup_regra_nome: p.regra_nome,
+    previsto_ate: p.previsto_ate,
   }));
 
   return NextResponse.json({

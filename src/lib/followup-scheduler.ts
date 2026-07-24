@@ -239,7 +239,10 @@ export interface FollowupPrevisto {
   regra_id: string;
   regra_nome: string;
   mensagem_texto: string;
+  /** Início da janela do dia previsto — usado só pra ordenar/filtrar, não é o horário exato de envio. */
   previsto_para: string;
+  /** Fim da janela do dia previsto (horario_fim da regra). */
+  previsto_ate: string;
 }
 
 /**
@@ -291,10 +294,18 @@ export async function calcularFollowupsPrevistos(leadId?: string): Promise<Follo
     for (const lead of leads) {
       if (sentIds.has(lead.id) || queuedIds.has(lead.id)) continue;
 
+      // O horário exato só é decidido de verdade quando o lead vira elegível
+      // (scheduleFollowups sorteia um slot dentro da janela horario_inicio-
+      // horario_fim, junto com os outros leads elegíveis naquele momento).
+      // Aqui mostramos a JANELA inteira em vez de um horário fixo — senão
+      // todo lead aparece "cravado" no mesmo horário, o que não reflete o
+      // sorteio anti-robotização real.
       const diaBrasil = paraBrasil(new Date(lead.estagio_atualizado_em));
       diaBrasil.setUTCDate(diaBrasil.getUTCDate() + regra.dias_espera);
-      const [h, m] = (regra.hora_envio || regra.horario_inicio || "08:00").split(":").map(Number);
-      const previstoPara = horarioBrasilParaUTC(diaBrasil, h, m);
+      const [hi, mi] = (regra.horario_inicio || "08:00").split(":").map(Number);
+      const [hf, mf] = (regra.horario_fim || "18:00").split(":").map(Number);
+      const previstoPara = horarioBrasilParaUTC(diaBrasil, hi, mi);
+      const previstoAte = horarioBrasilParaUTC(diaBrasil, hf, mf);
 
       previstos.push({
         lead_id: lead.id,
@@ -304,6 +315,7 @@ export async function calcularFollowupsPrevistos(leadId?: string): Promise<Follo
         regra_nome: regra.nome,
         mensagem_texto: texto,
         previsto_para: previstoPara.toISOString(),
+        previsto_ate: previstoAte.toISOString(),
       });
     }
   }

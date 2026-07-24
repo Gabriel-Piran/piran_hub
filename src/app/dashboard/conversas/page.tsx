@@ -97,6 +97,23 @@ function formatAgendadoAmigavel(iso: string): string {
   return formatAgendado(iso);
 }
 
+function formatJanelaAmigavel(inicioIso: string, fimIso: string): string {
+  const inicio = new Date(inicioIso);
+  const fim = new Date(fimIso);
+  const horaInicio = String(inicio.getHours()).padStart(2, "0") + ":" + String(inicio.getMinutes()).padStart(2, "0");
+  const horaFim = String(fim.getHours()).padStart(2, "0") + ":" + String(fim.getMinutes()).padStart(2, "0");
+
+  const hoje = new Date();
+  const amanha = new Date(hoje);
+  amanha.setDate(hoje.getDate() + 1);
+
+  const mesmoDia = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+  const quando = mesmoDia(inicio, hoje) ? "hoje" : mesmoDia(inicio, amanha) ? "amanhã" : formatAgendado(inicioIso).split(" ")[0];
+  return `${quando}, entre ${horaInicio} e ${horaFim}`;
+}
+
 function formatTelefoneBR(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 13);
   const pais = digits.slice(0, 2);
@@ -178,7 +195,11 @@ function MensagensAgendadasPanel({
                       : isFollowup
                         ? `Follow-up${m.followup_regra_nome ? ` (${m.followup_regra_nome})` : ""}`
                         : "Aguardando envio"}{" "}
-                    {m.agendado_para ? formatAgendadoAmigavel(m.agendado_para) : ""}
+                    {isPrevisto && m.agendado_para && m.previsto_ate
+                      ? formatJanelaAmigavel(m.agendado_para, m.previsto_ate)
+                      : m.agendado_para
+                        ? formatAgendadoAmigavel(m.agendado_para)
+                        : ""}
                   </Badge>
                 </div>
                 {!isFollowup && !isPrevisto && (

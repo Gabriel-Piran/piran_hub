@@ -521,6 +521,19 @@ function QueueMonitor({ regras }: { regras: any[] }) {
     }
   };
 
+  const formatJanelaPrevista = (inicioIso: string, fimIso: string) => {
+    try {
+      const inicio = new Date(inicioIso);
+      const fim = new Date(fimIso);
+      const dia = inicio.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const horaInicio = inicio.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const horaFim = fim.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return `${dia}, entre ${horaInicio} e ${horaFim}`;
+    } catch {
+      return inicioIso;
+    }
+  };
+
   const getStatusBadge = (s: string) => {
     switch (s) {
       case "pendente":
@@ -624,7 +637,11 @@ function QueueMonitor({ regras }: { regras: any[] }) {
                   <td className="px-4 py-3 font-medium text-white">{leadName}</td>
                   <td className="px-4 py-3 text-white/60">{leadPhone}</td>
                   <td className="px-4 py-3 text-white/60">{ruleName}</td>
-                  <td className="px-4 py-3 text-white/60">{formatDateTime(item.agendado_para)}</td>
+                  <td className="px-4 py-3 text-white/60">
+                    {item.status === "previsto" && item.previsto_ate
+                      ? formatJanelaPrevista(item.agendado_para, item.previsto_ate)
+                      : formatDateTime(item.agendado_para)}
+                  </td>
                   <td className="px-4 py-3">{getStatusBadge(item.status)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
