@@ -201,9 +201,19 @@ export async function POST(request: Request) {
     if (lead) {
       const acao = await encontrarAcaoPorRegra(supabase, texto, lead.estagio ?? "");
       if (acao) {
-        // Dispara a ação da regra condicional em paralelo ao atendimento
-        // normal da IA (não bloqueia nem substitui o repasse para o n8n).
-        await executarAcao(supabase, acao.id, lead.id).catch(() => null);
+        const resultado = await executarAcao(supabase, acao.id, lead.id).catch(() => null);
+
+        // "Arquivar" é uma exceção: se repassarmos a mensagem pro n8n depois,
+        // o Upsert Lead de lá reativa o lead automaticamente (é a lógica que
+        // desarquiva quando um lead antigo manda mensagem de novo) — e
+        // desfaz o arquivamento que acabamos de fazer com essa mesma
+        // mensagem. Por isso não repassa nesse caso, igual /restart /parar
+        // /ia já fazem.
+        if (resultado?.ok && acao.tipo === "arquivar") {
+          return NextResponse.json({ comando: "regra_condicional", acao: acao.slug, executado: true });
+        }
+        // Demais tipos de ação continuam rodando em paralelo ao atendimento
+        // normal da IA (não bloqueiam nem substituem o repasse para o n8n).
       }
     }
   }
