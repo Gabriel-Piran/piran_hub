@@ -86,12 +86,66 @@ export async function PATCH(request: Request) {
     const body = await request.json().catch(() => null);
     const id = body?.id;
     const acao = body?.acao; // 'cancelar' | 'reagendar'
+    const leadId = body?.lead_id;
+    const regraId = body?.regra_id;
 
-    if (!id || !acao) {
-      return NextResponse.json({ error: "id e acao são obrigatórios" }, { status: 400 });
+    if (!id && !(leadId && regraId)) {
+      return NextResponse.json(
+        { error: "informe id, ou lead_id + regra_id para cancelar um previsto" },
+        { status: 400 }
+      );
+    }
+    if (!acao) {
+      return NextResponse.json({ error: "acao é obrigatória" }, { status: 400 });
     }
 
     const supabase = supabaseAdmin();
+
+    // Cancela um item "previsto" (ainda sem linha real em followup_fila) —
+    // grava uma linha-marcador com status "cancelado" pra esse lead+regra
+    // nunca serem enfileirados de verdade, já que a elegibilidade real
+    // (agendarFollowupsParaRegra/calcularFollowupsPrevistos) passa a
+    // excluir quem já tem uma linha "cancelado".
+    if (!id && leadId && regraId && acao === "cancelar") {
+      const { data: regra } = await supabase
+        .from("followup_regras")
+        .select("*, mensagens_rapidas(*)")
+        .eq("id", regraId)
+        .maybeSingle();
+
+      if (!regra) {
+        return NextResponse.json({ error: "Regra não encontrada" }, { status: 404 });
+      }
+
+      let texto = regra.mensagem_texto || "";
+      let midiaUrl: string | null = null;
+      let tipo = "texto";
+      if (regra.mensagens_rapidas) {
+        texto = regra.mensagens_rapidas.conteudo || "";
+        midiaUrl = regra.mensagens_rapidas.midia_url || null;
+        tipo = regra.mensagens_rapidas.tipo || "texto";
+      }
+
+      const { data, error } = await supabase
+        .from("followup_fila")
+        .insert({
+          lead_id: leadId,
+          regra_id: regraId,
+          mensagem_texto: texto,
+          midia_url: midiaUrl,
+          tipo,
+          agendado_para: new Date().toISOString(),
+          status: "cancelado",
+          tentativas: 0,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json(data);
+    }
 
     if (acao === "cancelar") {
       const { data, error } = await supabase

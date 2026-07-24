@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { zapiConfig, type ZapiInstancia } from "@/lib/zapi";
-import { shuffle, isEligibleDay, getNextEligibleDay } from "@/lib/followup-scheduler";
+import { shuffle, isEligibleDay, getNextEligibleDay, paraBrasil, horarioBrasilParaUTC } from "@/lib/followup-scheduler";
 import { autorizadoCron } from "@/lib/cron";
 
 async function calcularProximoAgendamento(
@@ -23,8 +23,8 @@ async function calcularProximoAgendamento(
   const totalWindowMinutes = endHour * 60 + endMin - (startHour * 60 + startMin);
   const slotsPerDay = Math.max(1, Math.floor(totalWindowMinutes / intervalMin));
 
-  let currentDate = new Date();
-  currentDate.setDate(currentDate.getDate() + Math.max(1, regra.dias_espera));
+  let currentDate = paraBrasil(new Date());
+  currentDate.setUTCDate(currentDate.getUTCDate() + Math.max(1, regra.dias_espera));
 
   while (true) {
     if (!isEligibleDay(currentDate, diasSemana)) {
@@ -34,9 +34,8 @@ async function calcularProximoAgendamento(
 
     const slots: Date[] = [];
     for (let i = 0; i < slotsPerDay; i++) {
-      const slotDate = new Date(currentDate);
-      slotDate.setHours(startHour, startMin, 0, 0);
-      slotDate.setMinutes(slotDate.getMinutes() + i * intervalMin);
+      const slotDate = horarioBrasilParaUTC(currentDate, startHour, startMin);
+      slotDate.setUTCMinutes(slotDate.getUTCMinutes() + i * intervalMin);
       if (slotDate.getTime() > Date.now()) {
         slots.push(slotDate);
       }

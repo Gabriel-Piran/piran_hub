@@ -471,12 +471,17 @@ function QueueMonitor({ regras }: { regras: any[] }) {
     fetch(endpoint).then((r) => r.json()).catch(() => [])
   );
 
-  const handleCancelar = async (id: string) => {
+  const handleCancelar = async (item: any) => {
     try {
+      const isPrevisto = item.status === "previsto";
       const res = await fetch("/api/followup/fila", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, acao: "cancelar" }),
+        body: JSON.stringify(
+          isPrevisto
+            ? { lead_id: item.lead_id, regra_id: item.regra_id, acao: "cancelar" }
+            : { id: item.id, acao: "cancelar" }
+        ),
       });
       if (!res.ok) throw new Error();
       toast.success("Envio cancelado com sucesso.");
@@ -638,17 +643,17 @@ function QueueMonitor({ regras }: { regras: any[] }) {
                           </Button>
                         </div>
                       )}
-                      {item.status === "pendente" && (
+                      {(item.status === "pendente" || item.status === "previsto") && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleCancelar(item.id)}
+                          onClick={() => handleCancelar(item)}
                           className="h-7 text-xs px-2 border border-red-500/30 text-red-400 hover:bg-red-500/10"
                         >
                           Cancelar
                         </Button>
                       )}
-                      {item.status !== "pendente" && item.status !== "erro" && (
+                      {item.status !== "pendente" && item.status !== "erro" && item.status !== "previsto" && (
                         <span className="text-xs text-white/20">—</span>
                       )}
                     </div>

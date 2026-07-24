@@ -190,15 +190,14 @@ function MensagensAgendadasPanel({
                     <Pencil className="h-4 w-4" />
                   </button>
                 )}
-                {!isPrevisto && (
-                  <button
-                    onClick={() => onCancelar(m.id)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
-                    aria-label="Cancelar mensagem agendada"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+                <button
+                  onClick={() => onCancelar(m.id)}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white/50 hover:bg-white/5 hover:text-red-400"
+                  aria-label={isPrevisto ? "Cancelar follow-up previsto" : "Cancelar mensagem agendada"}
+                  title={isPrevisto ? "Impede que esse follow-up seja agendado pra esse lead" : undefined}
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             );
           })}
@@ -1189,18 +1188,27 @@ function ConversationsView() {
 
   const handleCancelarAgendamento = async (mensagemId: string) => {
     try {
-      const isFollowup = mensagemId.startsWith("followup:");
-      const res = isFollowup
-        ? await fetch(`/api/followup/fila`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: mensagemId.slice("followup:".length), acao: "cancelar" }),
-          })
-        : await fetch(`/api/mensagens/${mensagemId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ acao_executada: "cancelado" }),
-          });
+      let res: Response;
+      if (mensagemId.startsWith("followup:")) {
+        res = await fetch(`/api/followup/fila`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: mensagemId.slice("followup:".length), acao: "cancelar" }),
+        });
+      } else if (mensagemId.startsWith("previsto:")) {
+        const [, leadId, regraId] = mensagemId.split(":");
+        res = await fetch(`/api/followup/fila`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lead_id: leadId, regra_id: regraId, acao: "cancelar" }),
+        });
+      } else {
+        res = await fetch(`/api/mensagens/${mensagemId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ acao_executada: "cancelado" }),
+        });
+      }
       if (!res.ok) throw new Error();
       await mutate();
       toast.success("Agendamento cancelado.");

@@ -1,6 +1,35 @@
 import { supabaseAdmin } from "./supabase";
 
 /**
+ * Brasil não tem horário de verão desde 2019 — UTC-3 fixo. O servidor
+ * (Railway) roda em UTC, então Date.setHours/getDay aplicam o fuso do
+ * SERVIDOR, não o de Brasília — sem isso, "horário comercial 08h-18h"
+ * vira 08h-18h UTC (= 05h-15h em Brasília), 3h adiantado. paraBrasil +
+ * horarioBrasilParaUTC evitam depender do fuso do processo Node.
+ */
+const BRASIL_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+/** Desloca o instante pro fuso de Brasília — os getters getUTC* do resultado já dão ano/mês/dia/hora em horário de Brasília. */
+export function paraBrasil(instant: Date): Date {
+  return new Date(instant.getTime() - BRASIL_OFFSET_MS);
+}
+
+/** Constrói o instante UTC real correspondente a hora:minuto em Brasília, no dia (já em "fuso Brasília") de diaBrasilRef. */
+export function horarioBrasilParaUTC(diaBrasilRef: Date, hora: number, minuto: number): Date {
+  return new Date(
+    Date.UTC(
+      diaBrasilRef.getUTCFullYear(),
+      diaBrasilRef.getUTCMonth(),
+      diaBrasilRef.getUTCDate(),
+      hora,
+      minuto,
+      0,
+      0
+    ).valueOf() + BRASIL_OFFSET_MS
+  );
+}
+
+/**
  * Encontra leads elegíveis para uma regra (no estágio-gatilho, parados há
  * dias_espera ou mais, ativos, e que ainda não receberam/estão na fila para
  * essa regra) e agenda o follow-up para eles. Usado tanto pelo endpoint
@@ -45,7 +74,7 @@ export async function agendarFollowupsParaRegra(regraId: string): Promise<number
     .from("followup_fila")
     .select("lead_id")
     .eq("regra_id", regraId)
-    .in("status", ["pendente", "enviado"]);
+    .in("status", ["pendente", "enviado", "cancelado"]);
   const queuedLeadIds = new Set((queued ?? []).map((q) => q.lead_id));
 
   const eligibleLeadIds = leads
@@ -106,7 +135,7 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
   }
 
   let currentLeadIndex = 0;
-  let currentDate = new Date(); // Start scheduling from now
+  let currentDate = paraBrasil(new Date()); // instante deslocado — getUTC* dão o horário de Brasília
 
   interface FollowupFilaItem {
     lead_id: string;
@@ -132,9 +161,8 @@ export async function scheduleFollowups(leadIds: string[], regraId: string): Pro
     // intervalMin e intervalMax minutos (evita cadência robótica).
     const slots: Date[] = [];
     for (let offset = 0; offset < totalWindowMinutes; offset += randomInterval(intervalMin, intervalMax)) {
-      const slotDate = new Date(currentDate);
-      slotDate.setHours(startHour, startMin, 0, 0);
-      slotDate.setMinutes(slotDate.getMinutes() + offset);
+      const slotDate = horarioBrasilParaUTC(currentDate, startHour, startMin);
+      slotDate.setUTCMinutes(slotDate.getUTCMinutes() + offset);
 
       // Only schedule in the future
       if (slotDate.getTime() > Date.now()) {
@@ -254,7 +282,7 @@ export async function calcularFollowupsPrevistos(leadId?: string): Promise<Follo
       .from("followup_fila")
       .select("lead_id")
       .eq("regra_id", regra.id)
-      .in("status", ["pendente", "enviado"]);
+      .in("status", ["pendente", "enviado", "cancelado"]);
     const queuedIds = new Set((queued ?? []).map((q) => q.lead_id));
 
     let texto = regra.mensagem_texto || "";
@@ -263,10 +291,10 @@ export async function calcularFollowupsPrevistos(leadId?: string): Promise<Follo
     for (const lead of leads) {
       if (sentIds.has(lead.id) || queuedIds.has(lead.id)) continue;
 
-      const previstoPara = new Date(lead.estagio_atualizado_em);
-      previstoPara.setDate(previstoPara.getDate() + regra.dias_espera);
+      const diaBrasil = paraBrasil(new Date(lead.estagio_atualizado_em));
+      diaBrasil.setUTCDate(diaBrasil.getUTCDate() + regra.dias_espera);
       const [h, m] = (regra.hora_envio || regra.horario_inicio || "08:00").split(":").map(Number);
-      previstoPara.setHours(h, m, 0, 0);
+      const previstoPara = horarioBrasilParaUTC(diaBrasil, h, m);
 
       previstos.push({
         lead_id: lead.id,
@@ -283,17 +311,19 @@ export async function calcularFollowupsPrevistos(leadId?: string): Promise<Follo
   return previstos;
 }
 
+/** `date` deve ser um instante já deslocado por paraBrasil() — usa getUTCDay pra não depender do fuso do servidor. */
 export function isEligibleDay(date: Date, diasSemana: string[]): boolean {
-  const dayNum = date.getDay();
+  const dayNum = date.getUTCDay();
   const dayStr = dayNum === 0 ? "7" : String(dayNum);
   return diasSemana.includes(dayStr) || diasSemana.includes(String(dayNum));
 }
 
+/** `date` deve ser um instante já deslocado por paraBrasil(); retorna outro instante no mesmo "fuso deslocado". */
 export function getNextEligibleDay(date: Date, diasSemana: string[]): Date {
   const next = new Date(date);
   while (true) {
-    next.setDate(next.getDate() + 1);
-    const dayNum = next.getDay();
+    next.setUTCDate(next.getUTCDate() + 1);
+    const dayNum = next.getUTCDay();
     const dayStr = dayNum === 0 ? "7" : String(dayNum);
     if (diasSemana.includes(dayStr) || diasSemana.includes(String(dayNum))) {
       return next;
