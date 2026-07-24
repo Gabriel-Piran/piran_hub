@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiFetch } from "@/lib/api";
@@ -286,18 +286,38 @@ function BaseConhecimentoView() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [criandoNovo, setCriandoNovo] = useState(false);
+  const [busca, setBusca] = useState("");
+
+  const itensFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return itens;
+    return itens.filter((item) => {
+      const alvo = [
+        item.categoria,
+        item.titulo,
+        item.quando_usar,
+        item.resposta_modelo,
+        ...(item.exemplos_frases ?? []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return alvo.includes(termo);
+    });
+  }, [itens, busca]);
 
   const categorias = useMemo(() => {
     const grupos = new Map<string, BaseConhecimentoItem[]>();
-    for (const item of itens) {
+    for (const item of itensFiltrados) {
       const lista = grupos.get(item.categoria) ?? [];
       lista.push(item);
       grupos.set(item.categoria, lista);
     }
     return Array.from(grupos.entries());
-  }, [itens]);
+  }, [itensFiltrados]);
 
-  const selected = criandoNovo ? null : itens.find((i) => i.id === selectedId) ?? itens[0] ?? null;
+  const selected = criandoNovo
+    ? null
+    : itens.find((i) => i.id === selectedId) ?? itensFiltrados[0] ?? null;
 
   const handleSaved = (updated: BaseConhecimentoItem) => {
     setCriandoNovo(false);
@@ -335,6 +355,19 @@ function BaseConhecimentoView() {
               Novo
             </Button>
           )}
+        </div>
+
+        <div className="border-b border-white/10 px-4 py-3">
+          <div className="flex items-center gap-2 rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-white/40" />
+            <input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por título, frase, categoria..."
+              className="w-full bg-transparent text-sm text-white placeholder:text-white/40 focus:outline-none"
+            />
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col overflow-y-auto">
@@ -390,6 +423,12 @@ function BaseConhecimentoView() {
           {!isLoading && itens.length === 0 && (
             <p className="px-4 py-6 text-center text-sm text-white/40">
               Nenhum tópico cadastrado ainda.
+            </p>
+          )}
+
+          {!isLoading && itens.length > 0 && itensFiltrados.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-white/40">
+              Nenhum tópico encontrado para "{busca}".
             </p>
           )}
         </div>
