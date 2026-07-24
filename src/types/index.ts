@@ -230,3 +230,16 @@ export interface PromptAlineHistorico {
   editado_por: string | null;
   criado_em: string;
 }
+
+export interface BaseConhecimentoItem {
+  id: string;
+  categoria: string;
+  titulo: string;
+  quando_usar: string;
+  exemplos_frases: string[];
+  resposta_modelo: string;
+  ordem: number;
+  ativo: boolean;
+  criado_em: string;
+  atualizado_em: string;
+}

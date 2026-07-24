@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BookOpen,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -54,6 +55,12 @@ const NAV_ITEMS: { href: string; label: string; icon: typeof LayoutDashboard; ro
     href: "/dashboard/aline",
     label: "Aline",
     icon: Sparkles,
+    roles: ["admin", "advogado"],
+  },
+  {
+    href: "/dashboard/base-conhecimento",
+    label: "Base de conhecimento",
+    icon: BookOpen,
     roles: ["admin", "advogado"],
   },
   {
