@@ -721,9 +721,15 @@ function ConversationsView() {
   }, [filtros]);
   const extraQs = filtrosExtras ? `&${filtrosExtras}` : "";
 
-  const iaQuery = `/api/leads?modo_atendimento=ia&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
-  const pendenteQuery = `/api/leads?modo_atendimento=pendente&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
-  const humanoQuery = `/api/leads?modo_atendimento=humano&status=ativo${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  // Leads com contrato enviado/assinado continuam conversando normalmente
+  // (ex.: confirmação de recebimento, aviso de assinatura) até chegarem em
+  // AGUARDANDO — por isso entram nas mesmas abas de "ativo", não só
+  // "ativo" literal, senão a conversa some do painel assim que o
+  // contrato é gerado.
+  const STATUS_VISIVEIS = "ativo,contrato_enviado,contrato_assinado";
+  const iaQuery = `/api/leads?modo_atendimento=ia&status=${STATUS_VISIVEIS}${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  const pendenteQuery = `/api/leads?modo_atendimento=pendente&status=${STATUS_VISIVEIS}${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
+  const humanoQuery = `/api/leads?modo_atendimento=humano&status=${STATUS_VISIVEIS}${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
   const arquivadoQuery = `/api/leads?status=arquivado${departamentoFiltro !== "TODOS" ? `&departamento_id=${departamentoFiltro}` : ""}${extraQs}`;
 
   const { data: iaLeadsRaw, mutate: mutateIA } = useSWR<any[]>(iaQuery, apiFetch, { refreshInterval: 5000 });

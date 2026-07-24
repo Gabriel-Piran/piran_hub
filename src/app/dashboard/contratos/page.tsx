@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FileCheck2, FileClock } from "lucide-react";
 
-import { useLeads } from "@/hooks/useDashboard";
+import { apiFetch } from "@/lib/api";
 import type { Lead } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,22 +15,20 @@ import { ErrorBoundary } from "@/components/dashboard/ErrorBoundary";
 import { LeadDetailSheet } from "@/components/dashboard/LeadDetailSheet";
 
 function ContratosView() {
-  const { leads, isLoading } = useLeads();
+  // /api/contratos já filtra por status (contrato_enviado/contrato_assinado)
+  // — não usar useLeads() aqui, que só traz status=ativo e nunca inclui
+  // leads que já geraram contrato.
+  const { data, isLoading } = useSWR<Lead[]>(
+    "/api/contratos",
+    (endpoint: string) => apiFetch<Lead[]>(endpoint),
+    { refreshInterval: 5000, onError: (err) => console.error("SWR error:", err) }
+  );
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  const contratos = useMemo(
-    () =>
-      leads
-        .filter((lead) => lead.estagio === "CONTRATO" || lead.estagio === "AGUARDANDO")
-        .sort(
-          (a, b) =>
-            new Date(b.atualizado_em).getTime() - new Date(a.atualizado_em).getTime()
-        ),
-    [leads]
-  );
+  const contratos = Array.isArray(data) ? data : [];
 
-  const enviados = contratos.filter((c) => c.estagio === "CONTRATO").length;
-  const aguardando = contratos.filter((c) => c.estagio === "AGUARDANDO").length;
+  const enviados = contratos.length;
+  const aguardando = contratos.filter((c) => c.status === "contrato_enviado").length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,10 +93,10 @@ function ContratosView() {
                     {lead.numero_whatsapp}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge variant={lead.estagio === "AGUARDANDO" ? "muted" : "default"}>
-                      {lead.estagio === "AGUARDANDO"
-                        ? "Aguardando assinatura"
-                        : "Contrato enviado"}
+                    <Badge variant={lead.status === "contrato_assinado" ? "indicacoes" : "muted"}>
+                      {lead.status === "contrato_assinado"
+                        ? "Assinado"
+                        : "Aguardando assinatura"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
